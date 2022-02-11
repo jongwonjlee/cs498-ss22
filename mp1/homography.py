@@ -199,4 +199,7 @@ plt.show()
 
 # dump the results for autograde
 outfile = 'solution_homography.npz'
+
+logo_warp = logo_warp * 255.0; logo_warp = logo_warp.astype(np.uint8)
+im = im * 255.0; im = im.astype(np.uint8)
 np.savez(outfile, corners_court, H, target_transform, logo_warp, im)

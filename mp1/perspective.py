@@ -55,6 +55,7 @@ corners_3d = np.array([(0, court_width, 0), (court_length, court_width, 0), (cou
                        (board_to_baseline, (court_width-backboard_width)/2, lower_rim)])
 # --------------------------- End your code here   ---------------------------------------------
 
+print("corners_3d:\n", corners_3d)
 
 '''
 Question 5: complete the findProjection function
@@ -94,6 +95,7 @@ xyz = np.concatenate([corners_3d, np.ones((len(corners_3d), 1))], axis = 1)
 
 # Find the projection matrix from correspondences
 P = findProjection(xyz, uv)
+print("P:\n", P)
 
 # Recalculate the projected point location
 uv_project = P.dot(xyz.T).T

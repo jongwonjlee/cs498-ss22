@@ -2,6 +2,9 @@
 \usepackage{graphicx}
 \usepackage{hyperref}
 \usepackage{caption}
+\usepackage{listings}
+\usepackage{amsmath}
+\usepackage{amssymb}
 
 
 
@@ -44,9 +47,67 @@ In this question, we will examine properties of homography transformations and s
 \label{fig:intro}
 \end{figure}
 
+\paragraph{Answer:} 
+\begin{quote}
+    The four corners' coordinates in the given 2D frame are represented as below:
+
+    \#0: (0, 15.24), \#1: (28.65, 15.24), \#2: (28.65, 0), \#3: (0, 0)
+
+    These coordinates are filled in a numpy array \verb|corners_court| as below:
+    \begin{lstlisting}[language=Python]
+    corners_court = np.array([(0, 15.24),
+                              (28.65, 15.24),
+                              (28.65, 0),
+                              (0, 0)])
+    \end{lstlisting}
+\end{quote}
 
 \paragraph{Question 2 [3pts]:}
 Given your Q1's answer, now we could establish four pairs of point correspondence between two planes: the 2D basketball court plane and the 2D image plane. Using what we have learned in Lecture 3, complete the function \texttt{findHomography} and use it to estimate the homography matrix from the court to the image. Please briefly explain what you do for homography estimation and report the resulting matrix in this document. Hints: 1) you might find the function \texttt{vstack, hstack} to be handy for getting homogenous coordinate; 2) you might find \texttt{numpy.linalg.svd} to be useful; 3) lecture 3 described the homography estimate process. 
+
+\paragraph{Answer:} 
+\begin{quote}
+    Below is the implemented \verb|cv2.findHomography| function:
+    \begin{lstlisting}[language=Python]
+    def findHomography(pts_src, pts_dst):
+        N, _ = pts_src.shape
+        
+        A = np.zeros((2*N, 9))
+        for i in range(N):
+            Xi = np.append(pts_src[i], 1)
+            A[2*i, 3:6] = Xi
+            A[2*i+1, 0:3] = Xi
+            
+            A[2*i, 6:9] = - pts_dst[i][1] * Xi
+            A[2*i+1, 6:9] = - pts_dst[i][0] * Xi
+        
+        U, S, Vh = np.linalg.svd(A)
+        h = Vh[-1]
+        H = h.reshape(3, 3) / h[-1]
+
+        return H
+    \end{lstlisting}
+
+    The algorithm follows the formulation in Lecture 3. Assuming that $N$ point pairs are given, a $2N \times 9$ matrix \verb|A| is constructed, where every odd and even rows are filled with the appropriate values for each point pair. The flattened homography matrix \verb|h| is then obtained by solving a linear equation \verb|Ah = 0|, where \verb|h| satisfies the column vector corresponding to the minimal singular value in the right unitary matrix \verb|V| of \verb|A|'s singular value decomposition \verb|USV'|. Then a vector \verb|h| is reshaped into a $3 \times 3$ matrix \verb|H| normalized by \verb|H[2,2]| to comply with the result of the off-the-shelf function \verb|cv2.findHomography|.
+
+    The resulting homography matrix compared with that of \verb|cv2.findHomography| is as follows:
+    \begin{lstlisting}[language=Python]
+    >>> H = findHomography(corners_court, keypoints_im)
+    >>> print("H_ours:\n", H)
+    H_ours: 
+        [[ 1.20809640e+01  4.44696370e+01  7.92073117e+01]
+        [-8.05770293e+00  5.76174339e+00  6.42252451e+02]
+        [-2.12530603e-02  1.65326163e-02  1.00000000e+00]]
+    
+    >>> H_cv2, _ = cv2.findHomography(corners_court, keypoints_im)
+    >>> print("H_cv2:\n", H_cv2)
+    H_cv2:
+        [[ 1.20809613e+01  4.44696378e+01  7.92073135e+01]
+        [-8.05770579e+00  5.76174634e+00  6.42252441e+02]
+        [-2.12530631e-02  1.65326169e-02  1.00000000e+00]]
+    \end{lstlisting}
+    It is observed that the implemented \verb|findHomography| function returns the homography matrix same as that of \verb|cv2.findHomography|.
+\end{quote}
 
 % \[
 % \left[
@@ -109,17 +170,107 @@ We want to promote our CS498 class across the university. One of the marketing i
 
 \begin{itemize}
 \item \textbf{3.a [1pt]:} calculate the homography transform between the image coordinate of the two images \texttt{logo.png} and \texttt{court.png}. Hints: 1) could you compute the transform from \texttt{logo.png} to the basketball court 2) could you leverage the homography matrix you computed in Question 2? 
+
+\paragraph{Answer:} 
+\begin{quote}
+    Below is the code establishing the homography transformation from a 2D image \texttt{logo.png} to the 2D plane \texttt{court.png}:
+    \begin{lstlisting}[language=Python]
+    h, w, _ = logo.shape
+    # be care of axis convention in image coordinate
+    corners_logo_img = np.array([(0, 0), (w, 0), (w, h), (0, h)])
+    corners_logo_court = np.array([(23, 5), (29, 5), (29, 2), (23, 2)])
+
+    H_logo_court = findHomography(corners_logo_img, corners_logo_court)
+    H_court_target = findHomography(corners_court, keypoints_im)
+
+    target_transform = H_court_target @ H_logo_court
+    \end{lstlisting}
+
+    \verb|corners_logo_img| contains the four corners of \texttt{logo.png}---starting from top-left and clockwise as we did from \#0 to \#3---in pixel coornidates and \verb|corners_logo_court| expresses their corresponding locations on the court (where the banner will be appeared) in metric coordinates. Behold that the axis convention of \verb|corners_logo_img| is different from that of \verb|corners_logo_court|, as pixel coordinates start from the top of an image. Then, the homography from the orignal image (\texttt{logo.png}) to the 2D-court is established by applying \verb|H_logo_court = findHomography(corners_logo_img, corners_logo_court)|. 
+    
+    \verb|H_court_target = findHomography(corners_court, keypoints_im)| governs the homography transformation from the 2D-court to the image (\texttt{uiuc.png}) on which the banner will be projected. The resulting transform from \texttt{logo.png} to \texttt{uiuc.png} is then obtained by multiplying these homography matrices sequentially:
+    
+    \centering
+    \verb|target_transform = H_court_target @ H_logo_court|
+\end{quote}
+
 \item \textbf{3.b [2pt]:} complete the \texttt{warpImage} function and use the homography you computed in 3.a to warp the image \texttt{logo.png} from its image coordinate to the \texttt{court.png}'s image coordinate. Hints: 1) suppose $(x^\prime, y^\prime, 1)^T = \mathbf{H} (x, y, 1)^T$, we have $I_\mathrm{target}(x^\prime, y^\prime) = I_\mathrm{source}(x, y)$; 2) you might find \texttt{numpy.meshgrid} and \texttt{numpy.ravel\_multi\_index} to be useful. 
+
+\paragraph{Answer:} 
+\begin{quote}
+    Below is the function warping an input image \verb|image| into the shape of \verb|shape| upon the homography \verb|H|:
+    \begin{lstlisting}[language=Python]
+    def warpImage(image, H, shape):
+        Hs, Ws, _ = image.shape
+        Wt, Ht = shape
+        image_warped = np.zeros((Ht, Wt, 4))
+
+        Xs, Ys = np.meshgrid(np.arange(Ws), np.arange(Hs))
+        ps = np.array([Xs.flatten(), Ys.flatten(), np.ones(Xs.size)]).T
+        pt = (H @ ps.T).T
+        pt /= np.expand_dims(pt[:,-1], axis = 1)
+        pt = pt.astype(np.int32)
+        Xt = pt[:, 0]; Yt = pt[:, 1]
+        image_warped[Yt, Xt] = image.reshape(-1, 4)
+
+        return image_warped
+    \end{lstlisting}
+    
+    \verb|ps| is the array of pixel coordinates (in homogeneous form) in the source image (\verb|image|). \verb|pt|, the array of corresponding pixel locations on the target image (\verb|image_warped|), is then obtained by applying the homography matrix \verb|H| to \verb|ps|, with rounding to the closest integers. The target pixels are then colored with the source values and the output \verb|image_warped| is returned.
+
+    The warped \texttt{logo.png} to the target location on the court of \texttt{uiuc.png} is in Fig.~\ref{fig:warped_logo}.
+    \begin{figure}[h]
+        \centering
+        \includegraphics[width=0.7\linewidth]{../mp1/imgs/Q3-B.png}
+        \caption{The warped \texttt{logo.png}.}
+        \label{fig:warped_logo}
+    \end{figure}
+
+\end{quote}
+
 \item \textbf{3.c [1pt]:} alpha-blend the warped logo onto the court: $I = \alpha F + (1 - \alpha) B$
+
+\paragraph{Answer:} 
+\begin{quote}
+    Below is the code blending the warped \texttt{logo.png} and the target \texttt{uiuc.png}:
+    \begin{lstlisting}[language=Python]
+    alpha_logo = logo_warp[:,:,-1]
+    alpha_logo = np.expand_dims(alpha_logo, axis=-1)
+    im[:,:] = logo_warp[:,:] * alpha_logo + im[:,:] * (1 - alpha_logo)
+    \end{lstlisting}
+    
+    The alpha values---the extent to which each pixel is weighed when blending---are in the last channel of each pixel location. \verb|alpha_logo| reads those of the warped logo \verb|logo_warp|. Then, the blending of the background (\verb|im|) and the logo (\verb|logo_warp|) is done for every pixel.
+    
+    The blended outcome is in Fig.~\ref{fig:blended_image}.
+    \begin{figure}[h]
+        \centering
+        \includegraphics[width=0.7\linewidth]{../mp1/imgs/Q3-C.png}
+        \caption{The blended image.}
+        \label{fig:blended_image}
+    \end{figure}
+
+\end{quote}
+
 \end{itemize}
 
-
+\clearpage
 
 \section*{Perspective Projection [7pts]}
 Till now we have been working on transformations between 2D coordinate systems. Now let us to lift up to the 3D coordinate. Consider the same image of the state farm center, but this time, we annotate four additional points, corresponding to the four corners of the basketball backboard. 
 
 \paragraph{Question 4 [1pt]:} 
 The lower rim of the backboard is 2.745 meters above the ground; the backboard width is 1.83 meters and backboard height is 1.22 meters. The backboard protrudes 1.22 meters out from the baseline. Now let us consider the world frame. The world frame coordinate origin is at the point \#3, where x-axis is along the long edge (sideline) and y-axis is along the short edge (baseline), and z-axis is upwards, perpendicular to the basketball court.   Could you compute the 3D coordinate of all the eight keypoints?
+
+\paragraph{Answer:} 
+\begin{quote}
+    The eight corners' coordinates---four on the court and the others on the rim, starting from top-left and rotates clockwise---in the given 3D coordinate convention are represented as below:
+
+    \#0: (0, 15.24, 0), \#1: (28.65, 15.24, 0), \#2: (28.65, 0, 0), \#3: (0, 0, 0), \\
+    \#4: (1.22, 6.705, 3.965), \#5: (1.22, 8.535, 3.965), \#6: (1.22, 8.535, 2.745), \#7: (1.22, 6.705, 2.745)
+
+    These coordinates are filled in a numpy array \verb|corners_3d| based on the dimensions of court and rim pre-defined as variables. (For details, see the code.)
+\end{quote}
+
 
 \paragraph{Question 5 [4pt]:} 
 Now we have established eight pairs of 2D and 3D keypoint correspondences. 
@@ -157,18 +308,142 @@ where $\mathbf{p}_i^T$ is $i$th row of $\mathbf{P}$; $\mathbf{x}_i = (x_i, y_i, 
 \end{array}
 \right] = \mathbf{0} \textrm{\ where \ } \mathbf{A}_i = \left[
 \begin{array}{ccc}
-\mathbf{0} & -\mathbf{X}_i & - y_i \mathbf{X}_i \\
+\mathbf{0} & \mathbf{X}_i & - y_i \mathbf{X}_i \\
 \mathbf{X}_i & \mathbf{0} & - x_i \mathbf{X}_i\\
 \end{array}
 \right]
 \]
 Hints: consider using cross product between two similar vectors. 
+
+\paragraph{Answer:} 
+\begin{quote}
+    \textbf{Proof}:
+    
+    ($\ast$ Premise: $\mathbf{p}_i^T$ is a row vector. $\mathbf{x}_i$ and $\mathbf{X}_i$ are column vectors.)
+
+    \begin{equation*}
+    \begin{split}
+        \mathbf{x}_i \times \mathbf{P} \mathbf{X}_i = \mathbf{0} ~~~ (\because \mathbf{x}_i = \alpha \mathbf{P} \mathbf{X}_i) \\
+        \to 
+        \begin{bmatrix}
+            y_i \mathbf{p}_3^T \mathbf{X}_i - \mathbf{p}_2^T \mathbf{X}_i \\
+            -x_i \mathbf{p}_3^T \mathbf{X}_i + \mathbf{p}_1^T \mathbf{X}_i \\
+            x_i \mathbf{p}_2^T \mathbf{X}_i - y_i \mathbf{p}_1^T \mathbf{X}_i \\
+        \end{bmatrix} =
+        \begin{bmatrix}
+            0 \\ 0 \\ 0
+        \end{bmatrix}
+    \end{split}
+    \end{equation*}
+    
+    From the first and the second rows, 
+    \begin{equation*}
+    \begin{split}
+        \mathbf{X}_i^T (\mathbf{p}_2^T)^T - y_i \mathbf{X}_i^T (\mathbf{p}_3^T)^T = 0, \\
+        \mathbf{X}_i^T (\mathbf{p}_1^T)^T - x_i \mathbf{X}_i^T (\mathbf{p}_3^T)^T = 0.
+    \end{split}
+    \end{equation*}
+    
+    Hence, 
+    \begin{equation*}
+    \begin{bmatrix}
+        \mathbf{0}_{1\times3} & \mathbf{X}_i^T & -y_i \mathbf{X}_i^T \\
+        \mathbf{X}_i^T & \mathbf{0}_{1\times3} & -x_i \mathbf{X}_i^T 
+    \end{bmatrix}
+    \begin{bmatrix}
+        (\mathbf{p}_1^T)^T \\ (\mathbf{p}_2^T)^T \\ (\mathbf{p}_3^T)^T
+    \end{bmatrix}
+    =
+    \begin{bmatrix}
+        0 \\ 0
+    \end{bmatrix}. ~~~ \blacksquare
+    \end{equation*}
+        
+\end{quote}
+
 \item \textbf{5.b [3pt]:} complete the \texttt{findProjection} function and use this function to recover the perspective camera projection matrix, from the 3D world coordinate to the 2D image coordinate. Hints: 1) establish a linear system based on your derivation 2) given the eight keypoint correspondences, how many equations and how many unknown variables? 3) consider using \texttt{numpy.linalg.svd} to solve the linear system. 4) you might find \texttt{numpy.concatenate} and \texttt{numpy.reshape} to be handy.  
+
+\paragraph{Answer:} 
+\begin{quote}
+    Below is the function \texttt{findProjection}, returning the $3 \times 4$ matrix \verb|P| projecting from the 3D world coordinate \verb|xyz| to the 2D image coordinate \verb|uv|.
+    \begin{lstlisting}[language=Python]
+    def findProjection(xyz, uv):
+        N, _ = xyz.shape
+        
+        A = np.zeros((2*N, 12))
+        for i in range(N):
+            A[2*i, 4:8] = xyz[i]
+            A[2*i+1, 0:4] = xyz[i]
+            
+            A[2*i, 8:12] = - uv[i][1] * xyz[i]
+            A[2*i+1, 8:12] = - uv[i][0] * xyz[i]
+        
+        U, S, Vh = np.linalg.svd(A)
+        p = Vh[-1]
+        P = p.reshape(3, 4) / p[-1]
+        
+        return P
+    \end{lstlisting}
+    
+    The algorithm follows the formulation in 5.a. Assuming that $N$ point pairs are given, a $2N \times 12$ matrix \verb|A| is constructed, where every odd and even rows are filled with the appropriate values for each point pair. The flattened projection matrix \verb|p| is then obtained by solving a linear equation \verb|Ap = 0|, where \verb|p| satisfies the column vector corresponding to the minimal singular value in the right unitary matrix \verb|V| of \verb|A|'s singular value decomposition \verb|USV'|. Then a vector \verb|p| is reshaped into a $3 \times 4$ matrix \verb|P| normalized by \verb|P[2,3]|.
+    
+    The estimated projection matrix is as follows:
+    \begin{lstlisting}[language=Python]
+    P:
+    [[ 1.18682798e+01  5.03681893e+01  1.45686779e+01  7.34119776e+01]
+     [-8.26855706e+00  8.76915144e+00 -2.39149474e+01  6.35921983e+02]
+     [-2.16285953e-02  2.02166814e-02  4.33368607e-02  1.00000000e+00]]
+    \end{lstlisting}
+
+    The keypoints projected upon the estimated projection matrix \verb|P| compared to their truth are in Fig.~\ref{fig:projection_keypoints}.
+    \begin{figure}[h]
+        \centering
+        \includegraphics[width=0.7\linewidth]{../mp1/imgs/Q5-B.png}
+        \caption{The comparison of reprojected and original keypoints.}
+        \label{fig:projection_keypoints}
+    \end{figure}
+
+\end{quote}
+
 \item \textbf{5.c [1pt bonus]:} Try to answer the following questions: 1) assuming perfect correspondences, could we recover the projection matrix using even fewer points? Please indicate how many correspondences at least we need. 2) could we just use correspondences on the ground plane to recover this projection matrix? Please explain why or why not.     
+
+\paragraph{Answer:} 
+\begin{quote}
+\begin{itemize}
+    \item There are twelve unknown elements in the projection matrix $\mathbf{P}$ to be recovered, which means that we need at least twelve equations to obtain the solution of given matrix equation $\mathbf{A}\mathbf{p} = \mathbf{0}$. As each correspondence pair yields two linear equations in the matrix equation, at least six correspondences are required.
+    \item No. If only correspondences on the ground plane are given, the matrix $\mathbf{A}$ in $\mathbf{A}\mathbf{p} = \mathbf{0}$ becomes rank-deficient and the nontrivial solution $\mathbf{p}$ is not unique. Hence, additional correspondences outside the ground plane is necessary.
+\end{itemize}
+\end{quote}
+
 \end{itemize}
 
 \paragraph{Question 6 [2pt]:}
 Using our estimated projection matrix in Q5, we could insert any 3D object in the world coordinate frame onto the 2D image. In this question, let's consider the a simple case where we want to project a 3D point cloud onto the image plane and plot them. Suppose we want to put a giant stanford bunny statue in the center of the basketball court, could you compute the 2D coordinate of every vertex of this bunny using the projection matrix? Hints: 1) you might need to transform the bunny to the court center first 2) make sure the bunny is above the ground. 
+
+\paragraph{Answer:} 
+\begin{quote}
+    Below is the code transforming the stanford bunny to the 3D coordinate on the court, project and represent it to the 2D image \texttt{uiuc.png}.
+    \begin{lstlisting}[language=Python]
+    T_bunny_xyz = np.eye(4)
+    T_bunny_xyz[:3, -1] =\
+        np.array([court_length/2, court_width/2, -verts[:, -1].min()])
+    verts =\
+        T_bunny_xyz.dot(np.concatenate(
+            [verts, np.ones((len(verts), 1))], axis = 1).T).T
+    bunny_uv = P.dot(verts.T).T
+    bunny_uv = bunny_uv / np.expand_dims(bunny_uv[:, 2], axis = 1)
+    \end{lstlisting}
+    
+    First, the $SE(3)$ transformation matrix from the origin of the stanford bunny to that of 3D-coordinate on the court \verb|T_bunny_xyz| is defined---this is intended to locate the bunny at the center of court on the ground. Note that only translational components \verb|T_bunny_xyz[:3, -1]| are applied. Next, the bunny's pointclouds \verb|verts| are expreseed in the 3D coordinate of the court by applying \verb|T_bunny_xyz|. This is then projected onto the 2D image by applying the camera projection matrix \verb|P|. As a result, we obtain the pointclouds projected on the image plane \verb|bunny_uv| that we see.
+
+    The pointclouds of stanford bunny projected onto \texttt{uiuc.png} are in Fig.~\ref{fig:projection_bunny}.
+    \begin{figure}[h]
+        \centering
+        \includegraphics[width=0.7\linewidth]{../mp1/imgs/Q6.png}
+        \caption{The projected stanford bunny in \texttt{uiuc.png}.}
+        \label{fig:projection_bunny}
+    \end{figure}
+\end{quote}
 
 \paragraph{Question 7 [2pt bonus]:} Try to use an off-the-shelf renderer to render the 3D mesh in a more realistic manner (e.g. pyrender, moderngl, blender, mitsuba2). You could consider the following perspectives that might influence the realism: 1) shading 2) shadows 3) occlusion reasoning 4) lighting environments. 
 

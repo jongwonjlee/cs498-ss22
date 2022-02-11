@@ -14,3 +14,6 @@
 
 # npz
 *.npz
+
+# zip
+*.zip
