@@ -1,7 +1,11 @@
+from email.mime import base
+import random
+from turtle import left
 import numpy as np
 import open3d as o3d
 import matplotlib.pyplot as plt
 import cv2
+from sympy import randMatrix
 
 # read intrinsics, extrinsincs and camera images
 K1 = np.load('assets/fountain/Ks/0005.npy')
@@ -31,6 +35,8 @@ plt.show()
 # You only need to modify K1 and K2 here, if necessary. If you think they remain the same, leave here as blank and explain why.
 # --------------------------- Begin your code here ---------------------------------------------
 
+K1[:2, :] //= scale
+K2[:2, :] //= scale
 
 # --------------------------- End your code here   ---------------------------------------------
 
@@ -59,7 +65,7 @@ plt.show()
 # Visualize images after rectification and report K1, K2 in your PDF report.
 
 
-def stereo_matching_ssd(left_im, right_im, max_disp = 128, block_size = 7):
+def stereo_matching_ssd(left_im, right_im, max_disp=128, block_size=21):
   """
   Using sum of square difference to compute stereo matching.
   Arguments:
@@ -71,11 +77,58 @@ def stereo_matching_ssd(left_im, right_im, max_disp = 128, block_size = 7):
       disp_im: disparity image (h x w numpy array), storing the disparity values
   """
   # --------------------------- Begin your code here ---------------------------------------------
-  disp_map = np.zeros_like(left_im[:, :, 0])
+  assert left_im.shape == right_im.shape
+
+  # convert to grayscale
+  left_gray = cv2.cvtColor(left_im, cv2.COLOR_BGR2GRAY)
+  right_gray = cv2.cvtColor(right_im, cv2.COLOR_BGR2GRAY)
+  
+  h, w = left_gray.shape
+  
+  # create padded arrays
+  left_gray_padded = np.zeros((h+block_size-1,w+block_size-1), dtype=left_gray.dtype)
+  right_gray_padded = np.zeros((h+block_size-1,w+block_size-1,max_disp), dtype=right_gray.dtype)
+  
+  left_gray_padded[block_size//2:h+block_size//2, block_size//2:w+block_size//2] = left_gray
+  for d in range(max_disp):
+    right_gray_padded[block_size//2:h+block_size//2, block_size//2+d:w+min(block_size-1, block_size//2+d), d] =\
+       right_gray[:, :w+min(block_size-1, block_size//2+d)-block_size//2-d]
+
+  # create strided arrays
+  # left_gray_strided[i,j] indicates (block_size, block_size) np.array around left_gray[i,j]
+  # right_gray_strided[i,j,d] indicates (block_size, block_size) np.array around right_gray[i,j]
+  from numpy.lib.stride_tricks import as_strided
+
+  left_gray_strided = np.empty(shape=left_gray.shape+(block_size,block_size), dtype=left_gray.dtype)
+  right_gray_strided = np.empty(shape=right_gray.shape+(max_disp,)+(block_size,block_size), dtype=right_gray.dtype)
+
+  left_gray_strided = as_strided(left_gray_padded, shape=left_gray.shape+(block_size,block_size), strides=left_gray_padded.strides*2)
+  for d in range(max_disp):
+    right_gray_strided[:,:,d,:,:] = as_strided(right_gray_padded[:,:,d], shape=right_gray.shape+(block_size,block_size), strides=right_gray_padded.strides[:-1]*2)
+
+  # compute squared sum of distance
+  # disp_map_candidate[y,x,d] indicates the ssd at (y,x) with a disparity offset d
+  # disp_map_candidate = np.einsum('ijmn,ijdmn->ijd', left_gray_strided, right_gray_strided)
+  disp_map_candidate = np.einsum('ijdmn,ijdmn->ijd', right_gray_strided-left_gray_strided[:,:,np.newaxis], right_gray_strided-left_gray_strided[:,:,np.newaxis])
+  # disp_map_candidate = np.empty(shape=left_gray.shape+(max_disp,), dtype=np.int64)
+  # for d in range(max_disp):
+  #   for j in range(h):
+  #     for i in range(w):
+  #       disp_map_candidate[j,i,d] = ((left_gray_strided[j,i] - right_gray_strided[j,i,d])**2).sum()
+  
+
+  # extract disparity
+  # disp_map[y,x] indicates the disparity of two images at (y,x)
+  disp_map = np.argmin(disp_map_candidate, axis=2)
+  
+  # to avoid zero-division, covert zero elements to be -1
+  disp_map[np.where(disp_map==0)] = -1
+  disp_map = disp_map.astype(np.float64)
+
   # --------------------------- End your code here   ---------------------------------------------
   return disp_map
 
-disparity = stereo_matching_ssd(left_img, right_img, max_disp = 128, block_size=7)
+disparity = stereo_matching_ssd(left_img, right_img, max_disp=128, block_size=21)
 # Depending on your implementation, runtime could be a few minutes.
 # Feel free to try different hyper-parameters, e.g. using a higher-resolution image, or a bigger block size. Do you see any difference?
 
@@ -89,7 +142,7 @@ plt.show()
 left_gray = cv2.cvtColor(left_img, cv2.COLOR_BGR2GRAY)
 right_gray = cv2.cvtColor(right_img, cv2.COLOR_BGR2GRAY)
 plt.imshow(np.concatenate((left_gray, right_gray), axis = 1), 'gray')
-stereo = cv2.StereoBM_create(numDisparities=128, blockSize=7)
+stereo = cv2.StereoBM_create(numDisparities=128, blockSize=21)
 disparity_cv2 = stereo.compute(left_gray, right_gray) / 16.0
 plt.imshow(np.concatenate((disparity, disparity_cv2), axis = 1))
 plt.show()
@@ -103,6 +156,33 @@ plt.show()
 # --------------------------- Begin your code here ---------------------------------------------
 xyz = None
 color = None
+
+baseline = np.linalg.norm(t)
+f = K1[0,0]
+
+U, V = np.meshgrid(np.arange(w)-w//2, np.arange(h)-h//2)
+Z = baseline / disparity * f
+X = Z / f * U
+Y = Z / f * V
+
+xyz = np.stack([X,Y,Z], axis=2)
+color = left_img
+
+xyz = np.reshape(xyz, (-1, 3))
+color = np.reshape(color, (-1, 3))
+
+dists = np.linalg.norm(xyz, axis=1)
+idx = np.where(dists < 20.0)[0]
+xyz = xyz[idx]; color = color[idx]
+
+fig = plt.figure()
+ax = fig.add_subplot(111, projection='3d')
+ax.scatter(xyz[:, 0], xyz[:, 1], xyz[:, 2], c='b', label='Points')
+ax.legend(loc='best')
+
+plt.show()
+
+
 # --------------------------- End your code here   ---------------------------------------------
 
 # Hints:

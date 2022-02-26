@@ -1,5 +1,6 @@
-# vscode
+# misc setups
 .vscode/
+__pycache__/
 
 # latex
 *.aux
@@ -12,10 +13,8 @@
 # sandbox
 *.ipynb
 
-# npz
+# high-volume data
 *.npz
-
-# zip
 *.zip
 
 mp2/assets/*

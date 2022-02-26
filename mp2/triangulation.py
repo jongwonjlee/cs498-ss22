@@ -42,7 +42,31 @@ def triangulate(K1, K2, R1, R2, t1, t2, all_good_matches):
     """
     points_3d = None
     # --------------------------- Begin your code here ---------------------------------------------
+    # credit: http://www.cs.cmu.edu/~16385/s17/Slides/11.4_Triangulation.pdf
 
+    # cosntruct camera projection matrix
+    T1 = np.eye(4); T1[:3, :3] = R1; T1[:3, -1] = t1.flatten()
+    T2 = np.eye(4); T2[:3, :3] = R2; T2[:3, -1] = t2.flatten()
+    eye_3by4 = np.zeros((3,4)); eye_3by4[:, :3] = np.eye(3)
+    M1 = K1 @ eye_3by4 @ T1
+    M2 = K2 @ eye_3by4 @ T2
+
+    # container for the estimated 3d points reconstructed by triangulation
+    points_3d = np.empty((len(all_good_matches), 3))
+    
+    for i, match in enumerate(all_good_matches):
+        # conduct triangulation of the given 2d matches
+        x1, y1, x2, y2 = match
+        A = np.vstack((y1 * M1[2,:] -      M1[1,:],
+                            M1[0,:] - x1 * M1[2,:],
+                       y2 * M2[2,:] -      M2[1,:],
+                            M2[0,:] - x2 * M2[2,:]))
+        U, S, Vh = np.linalg.svd(A)
+        pt_3d = np.reshape(Vh[-1, :], (4,))
+        pt_3d /= pt_3d[-1]
+
+        # save to the array
+        points_3d[i] = pt_3d[:-1]
 
     # --------------------------- End your code here   ---------------------------------------------
     return points_3d
@@ -58,6 +82,54 @@ if points_3d is not None:
     # Check this function for adding a virtual camera in the visualizer http://www.open3d.org/docs/release/tutorial/visualization/visualization.html#Function-draw_geometries
     # Open3D is not the only option. You could use matplotlib, vtk or other visualization tools as well.
     # --------------------------- Begin your code here ---------------------------------------------
+    def calc_camera_center(K, R, t):
+        """
+        Descriptions: get camera center in the world from the projection matrix
+        Parameters:
+            M: np.ndarray with shape (3, 4), a camera projection matrix
+        Returns:
+            camera_center: np.ndarray with shape (3, ), the estimated camera center corresponding to M
+        """
+        from scipy.linalg import null_space
+        
+        T = np.eye(4); T[:3, :3] = R; T[:3, -1] = t.flatten()
+        eye_3by4 = np.zeros((3,4)); eye_3by4[:, :3] = np.eye(3)
+        M = K @ eye_3by4 @ T
 
+        camera_center = null_space(M)   # estimate the camera center, a vector in the null space of M
+        camera_center /= camera_center[-1]  # normalize camera_center to be 3d homogeneous coordinate
+        camera_center = np.squeeze(camera_center[:-1])  # convert camera_center in homogeneous coordinate to be in non-homogeneous coordinate
+        
+        return camera_center
+    
+    # visualization of lab point cloud
+    cam1 = calc_camera_center(K1, R1, t1)
+    cam2 = calc_camera_center(K2, R2, t2)
+
+    camera_centers = np.vstack((cam1, cam2))
+
+    fig = plt.figure()
+    ax = fig.add_subplot(111, projection='3d')
+    ax.scatter(points_3d[:, 0], points_3d[:, 1], points_3d[:, 2], c='b', label='Points')
+    ax.scatter(camera_centers[:, 0], camera_centers[:, 1], camera_centers[:, 2], c='g', s=50, marker='^', label='Camera Centers')
+    ax.legend(loc='best')
+
+    plt.show()
+
+
+    '''
+    W = 640
+    H = 320
+    T1 = np.eye(4); T1[:3,:3] = R1; T1[:3,-1] = t1.flatten()
+    T2 = np.eye(4); T2[:3,:3] = R2; T2[:3,-1] = t2.flatten()
+
+    cam1 = o3d.geometry.LineSet.create_camera_visualization(W, H, K1, T1)
+    cam2 = o3d.geometry.LineSet.create_camera_visualization(W, H, K2, T2)
+    
+    
+    o3d.visualization.draw_geometries([cam1, cam2])
+    o3d.visualization.draw_geometries([pcd])
+    '''
+    
 
     # --------------------------- End your code here   ---------------------------------------------

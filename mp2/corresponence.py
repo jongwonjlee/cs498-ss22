@@ -16,6 +16,7 @@ import cv2 # our tested version is 4.5.5
 import numpy as np
 from matplotlib import pyplot as plt
 from pathlib import Path
+import scipy
 
 basedir= Path('assets/fountain')
 img1 = cv2.imread(str(basedir / 'images/0000.png'), 0)
@@ -64,10 +65,16 @@ def select_putative_matches(des1, des2):
     matches = []
     # --------------------------- Begin your code here ---------------------------------------------
     
+    # matrix containing distances between des1 and des2
+    dist_mat = scipy.spatial.distance.cdist(des1, des2, 'sqeuclidean')
+    # indices from the closest to the farthest points in des2 for every des1
+    dist_mat_idx = np.argsort(dist_mat, axis=1)
+    # indices for all matching candidates between des1 and des2
+    matches = list(zip(range(len(dist_mat)), dist_mat_idx[:, 0]))
     
     # --------------------------- End your code here   ---------------------------------------------
     
-    def lowe_ratio_test(matches):
+    def lowe_ratio_test(matches, ratio=5.0):
         """
         run lowe ratio test to filter out 
         Arguments: 
@@ -76,7 +83,13 @@ def select_putative_matches(des1, des2):
             matches: filter matches using lowe ratio test
         """
         # --------------------------- Begin your code here ---------------------------------------------
-    
+        
+        # sort distance matrix in the order of distance for every des1
+        dist_mat_sort = np.take_along_axis(dist_mat, dist_mat_idx, axis=1)
+        # indices for inliers passing lowe ratio test
+        inlier_idx = np.where(dist_mat_sort[:,0]*ratio < dist_mat_sort[:,1])[0]
+        # prune matching correspondences except for inliers
+        matches = list(map(tuple, np.array(matches)[inlier_idx]))
     
         # --------------------------- End your code here   ---------------------------------------------
         return matches

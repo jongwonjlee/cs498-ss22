@@ -24,6 +24,7 @@ This link also gives a thorough review of epipolar geometry:
     https://web.stanford.edu/class/cs231a/course_notes/03-epipolar-geometry.pdf
 '''
 
+from locale import normalize
 import os
 import cv2 # our tested version is 4.5.5
 import open3d as o3d
@@ -89,7 +90,46 @@ def estimate_fundamental_matrix(matches, normalize=False):
     """
     F = np.eye(3)
     # --------------------------- Begin your code here ---------------------------------------------
+    assert len(matches) >= 8
+    matches = matches.copy()
 
+    A = np.empty((len(matches), 9))
+
+    if normalize:
+        all_p1_mean = matches[:,:2].mean(axis=0)
+        all_p1_stdv = matches[:,:2].std(axis=0)
+        all_p2_mean = matches[:,2:].mean(axis=0)
+        all_p2_stdv = matches[:,2:].std(axis=0)
+
+        # normalize points
+        matches[:, :2] = (matches[:, :2] - all_p1_mean) / all_p1_stdv
+        matches[:, 2:] = (matches[:, 2:] - all_p2_mean) / all_p2_stdv
+
+        # construct transformation matrices
+        T1 = np.eye(3)
+        T1[:2, -1] -= all_p1_mean
+        T1[:2, :] /= all_p1_stdv[:, np.newaxis]
+        T2 = np.eye(3)
+        T2[:2, -1] -= all_p2_mean
+        T2[:2, :] /= all_p2_stdv[:, np.newaxis]
+        
+    # formulate a homogeneous linear equation
+    for i, match in enumerate(matches):
+        x1, y1, x2, y2 = match
+        A[i] = [x2 * x1, x2 * y1, x2, y2 * x1, y2 * y1, y2, x1, y1, 1]
+    
+    # get solution to the constructed homogeneous linear equation (in the form of Af = 0)
+    U, S, Vh = np.linalg.svd(A)
+    F = np.reshape(Vh[-1, :], (3, 3))   # reshape the min singular value into a 3 by 3 matrix (get f minimizing |Af|^2 subject to |f|^2 = 1)
+
+    # enforce rank-2 constraint to the reconstructed fundamental matrix F
+    U, S, Vh = np.linalg.svd(F)
+    S[-1] = 0
+    F = U @ np.diag(S) @ Vh
+    
+    # return to the original units with transformation matrices T1 and T2
+    if normalize:
+        F = T2.T @ F @ T1
 
     # --------------------------- End your code here   ---------------------------------------------
     return F
@@ -124,16 +164,41 @@ def ransac(all_matches, num_iteration, estimate_fundamental_matrix, inlier_thres
     ite = 0
     # --------------------------- Begin your code here ---------------------------------------------
 
-    #while ite < num_iteration:
+    while ite < num_iteration:
+        ## step 1. obtain a fundamental matrix candidate
+        # sample candidate matches randomly (at least eight-points are needed)
+        num_samples = 8
+        candidate_matches = all_good_matches[np.random.choice(len(all_good_matches), num_samples)]
+        
+        # estimate fundamental matrix of the candidate matches
+        F = estimate_fundamental_matrix(candidate_matches, normalize=True)
+        
+        ## step 2. check the inliers by applying the estimated fundamental matrix to the whole matches
+        # def apply_fundamental_matrix(F, matches):
+        # transform the set of image points into homogeneous coordinates
+        ones = np.ones((len(all_good_matches), 1))
+        all_p1 = np.concatenate((all_good_matches[:, 0:2], ones), axis=1)
+        all_p2 = np.concatenate((all_good_matches[:, 2:4], ones), axis=1)
+        # get coefficients of epipolar lines
+        F_p2 = np.dot(F.T, all_p2.T).T  # coefficients of epipolar lines appearing in img1 (corresponding to epipoles all_p1)
+        F_p1 = np.dot(F, all_p1.T).T    # coefficients of epipolar lines appearing in img2 (corresponding to epipoles all_p2)
+        # get geometric distances between reconstructed epipolar lines and corresponding epipoles
+        p1_line2 = np.sum(all_p1 * F_p2, axis=1)[:, np.newaxis]
+        p2_line1 = np.sum(all_p2 * F_p1, axis=1)[:, np.newaxis]
+        dist_all_p1 = np.absolute(p1_line2) / np.linalg.norm(F_p2, axis=1)[:, np.newaxis]    # set of distances between the estimated epipolar lines (projected from p2) and epipoles (p1)
+        dist_all_p2 = np.absolute(p2_line1) / np.linalg.norm(F_p1, axis=1)[:, np.newaxis]    # set of distances between the estimated epipolar lines (projected from p1) and epipoles (p2)
+        dist_all = (dist_all_p1 + dist_all_p2) / 2
 
-        # random sample correspondences
+        # get indices of inliers
+        inlier_idx = np.where(dist_all < inlier_threshold)[0]
 
-        # estimate the minimal fundamental estimation problem
+        # step 3. update the best solution upon the number of inliers 
+        if (inlier_matches_with_best_F is None) or (len(inlier_idx) > len(inlier_matches_with_best_F)):
+            best_F = F
+            inlier_matches_with_best_F = all_good_matches[inlier_idx]
+            avg_geo_dis_with_best_F = dist_all.sum() / len(all_matches)
 
-        # compute # of inliers
-
-        # update the current best solution
-
+        ite += 1
 
     # --------------------------- End your code here   ---------------------------------------------
     return best_F, inlier_matches_with_best_F, avg_geo_dis_with_best_F
@@ -146,7 +211,7 @@ def visualize_inliers(im1, im2, inlier_coords):
     plt.show()
 
 num_iterations = [1, 100, 10000]
-inlier_threshold = None # TODO: change the inlier threshold by yourself
+inlier_threshold = 1 # TODO: change the inlier threshold by yourself
 for num_iteration in num_iterations:
     best_F, inlier_matches_with_best_F, avg_geo_dis_with_best_F = ransac(all_good_matches, num_iteration, estimate_fundamental_matrix, inlier_threshold)
     if inlier_matches_with_best_F is not None:
@@ -157,13 +222,60 @@ for num_iteration in num_iterations:
 
 def visualize(estimated_F, img1, img2, kp1, kp2):
     # --------------------------- Begin your code here ---------------------------------------------
+    assert len(kp1) == len(kp2)
+    
+    all_p1 = np.concatenate((kp1, np.ones((len(kp1),1))), axis=1)
+    all_p2 = np.concatenate((kp2, np.ones((len(kp2),1))), axis=1)
+    
+    F_p2 = np.dot(estimated_F.T, all_p2.T).T  # coefficients of epipolar lines appearing in img1 (corresponding to epipoles all_p1)
+    F_p1 = np.dot(estimated_F, all_p1.T).T    # coefficients of epipolar lines appearing in img2 (corresponding to epipoles all_p2)
 
+    # get geometric distances between reconstructed epipolar lines and corresponding epipoles
+    p1_line2 = np.sum(all_p1 * F_p2, axis=1)[:,np.newaxis]
+    p2_line1 = np.sum(all_p2 * F_p1, axis=1)[:,np.newaxis]
+    dist_all_p1 = np.absolute(p1_line2) / np.linalg.norm(F_p2, axis=1)[:,np.newaxis]    # set of distances between the estimated epipolar lines (projected from p2) and epipoles (p1)
+    dist_all_p2 = np.absolute(p2_line1) / np.linalg.norm(F_p1, axis=1)[:,np.newaxis]    # set of distances between the estimated epipolar lines (projected from p1) and epipoles (p2)
 
+    # get points on every reconstructed line closest to the corresponding epipole
+    all_p1_closest = kp1 - F_p2[:,:2] / np.linalg.norm(F_p2[:,:2], axis=1)[:,np.newaxis] * np.einsum('ij,ij->i', all_p1, F_p2)[:,np.newaxis]
+    all_p2_closest = kp2 - F_p1[:,:2] / np.linalg.norm(F_p1[:,:2], axis=1)[:,np.newaxis] * np.einsum('ij,ij->i', all_p2, F_p1)[:,np.newaxis]
+
+    # find endpoints of segment on every epipolar line
+    # offset from the closest point is 10 pixels
+    l = 100
+    all_p1_src = all_p1_closest + np.hstack((F_p2[:,1][:,np.newaxis], -F_p2[:,0][:,np.newaxis])) / np.linalg.norm(F_p2[:,:2], axis=1)[:, np.newaxis] * l
+    all_p1_dst = all_p1_closest - np.hstack((F_p2[:,1][:,np.newaxis], -F_p2[:,0][:,np.newaxis])) / np.linalg.norm(F_p2[:,:2], axis=1)[:, np.newaxis] * l
+    all_p2_src = all_p2_closest + np.hstack((F_p1[:,1][:,np.newaxis], -F_p1[:,0][:,np.newaxis])) / np.linalg.norm(F_p1[:,:2], axis=1)[:, np.newaxis] * l
+    all_p2_dst = all_p2_closest - np.hstack((F_p1[:,1][:,np.newaxis], -F_p1[:,0][:,np.newaxis])) / np.linalg.norm(F_p1[:,:2], axis=1)[:, np.newaxis] * l
+
+    # Display points and segments of corresponding epipolar lines.
+    # You will see points in red corsses, epipolar lines in green 
+    # and a short cyan line that denotes the shortest distance between
+    # the epipolar line and the corresponding point.
+    
+    plt.tight_layout()
+
+    plt.subplot(1, 2, 1)
+    plt.imshow(img1, cmap='gray')
+    plt.plot(kp1[:,0], kp1[:,1],  '+r')
+    plt.plot([kp1[:,0], all_p1_closest[:,0]],[kp1[:,1], all_p1_closest[:,1]], 'r')
+    plt.plot([all_p1_src[:,0], all_p1_dst[:,0]],[all_p1_src[:,1], all_p1_dst[:,1]], 'g')
+    plt.xlim(0, img1.shape[1])
+    plt.ylim(img1.shape[0], 0)
+
+    plt.subplot(1, 2, 2)
+    plt.imshow(img2, cmap='gray')
+    plt.plot(kp2[:,0], kp2[:,1],  '+r')
+    plt.plot([kp2[:,0], all_p2_closest[:,0]],[kp2[:,1], all_p2_closest[:,1]], 'r')
+    plt.plot([all_p2_src[:,0], all_p2_dst[:,0]],[all_p2_src[:,1], all_p2_dst[:,1]], 'g')
+    plt.xlim(0, img2.shape[1])
+    plt.ylim(img2.shape[0], 0)
+    
+    plt.show()
     # --------------------------- End your code here   ---------------------------------------------
-    pass
 
 all_good_matches = np.load('assets/all_good_matches.npy')
-F_Q2 = None # link to your estimated F in Q3
-F_Q3 = None # link to your estimated F in Q3
+F_Q2 = F_with_normalization # link to your estimated F in Q3
+F_Q3 = best_F # link to your estimated F in Q3
 visualize(F_Q2, img1, img2, all_good_matches[:, :2], all_good_matches[:, 2:])
 visualize(F_Q3, img1, img2, all_good_matches[:, :2], all_good_matches[:, 2:])
