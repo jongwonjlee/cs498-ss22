@@ -81,30 +81,15 @@ if points_3d is not None:
     # Check this link for Open3D visualizer http://www.open3d.org/docs/release/tutorial/visualization/visualization.html#Function-draw_geometries
     # Check this function for adding a virtual camera in the visualizer http://www.open3d.org/docs/release/tutorial/visualization/visualization.html#Function-draw_geometries
     # Open3D is not the only option. You could use matplotlib, vtk or other visualization tools as well.
-    # --------------------------- Begin your code here ---------------------------------------------
-    def calc_camera_center(K, R, t):
-        """
-        Descriptions: get camera center in the world from the projection matrix
-        Parameters:
-            M: np.ndarray with shape (3, 4), a camera projection matrix
-        Returns:
-            camera_center: np.ndarray with shape (3, ), the estimated camera center corresponding to M
-        """
-        from scipy.linalg import null_space
-        
-        T = np.eye(4); T[:3, :3] = R; T[:3, -1] = t.flatten()
-        eye_3by4 = np.zeros((3,4)); eye_3by4[:, :3] = np.eye(3)
-        M = K @ eye_3by4 @ T
-
-        camera_center = null_space(M)   # estimate the camera center, a vector in the null space of M
-        camera_center /= camera_center[-1]  # normalize camera_center to be 3d homogeneous coordinate
-        camera_center = np.squeeze(camera_center[:-1])  # convert camera_center in homogeneous coordinate to be in non-homogeneous coordinate
-        
-        return camera_center
     
-    # visualization of lab point cloud
-    cam1 = calc_camera_center(K1, R1, t1)
-    cam2 = calc_camera_center(K2, R2, t2)
+    # --------------------------- Begin your code here ---------------------------------------------
+
+    # obtain camera center in 3D world frame
+    cam1 = - R1.T @ t1
+    cam2 = - R2.T @ t2
+
+    cam1 = cam1.flatten()
+    cam2 = cam2.flatten()
 
     camera_centers = np.vstack((cam1, cam2))
 
@@ -131,5 +116,4 @@ if points_3d is not None:
     o3d.visualization.draw_geometries([pcd])
     '''
     
-
     # --------------------------- End your code here   ---------------------------------------------

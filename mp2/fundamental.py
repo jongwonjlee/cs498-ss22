@@ -241,7 +241,7 @@ def visualize(estimated_F, img1, img2, kp1, kp2):
     all_p2_closest = kp2 - F_p1[:,:2] / np.linalg.norm(F_p1[:,:2], axis=1)[:,np.newaxis] * np.einsum('ij,ij->i', all_p2, F_p1)[:,np.newaxis]
 
     # find endpoints of segment on every epipolar line
-    # offset from the closest point is 10 pixels
+    # offset from the closest point is 100 pixels
     l = 100
     all_p1_src = all_p1_closest + np.hstack((F_p2[:,1][:,np.newaxis], -F_p2[:,0][:,np.newaxis])) / np.linalg.norm(F_p2[:,:2], axis=1)[:, np.newaxis] * l
     all_p1_dst = all_p1_closest - np.hstack((F_p2[:,1][:,np.newaxis], -F_p2[:,0][:,np.newaxis])) / np.linalg.norm(F_p2[:,:2], axis=1)[:, np.newaxis] * l
@@ -249,7 +249,7 @@ def visualize(estimated_F, img1, img2, kp1, kp2):
     all_p2_dst = all_p2_closest - np.hstack((F_p1[:,1][:,np.newaxis], -F_p1[:,0][:,np.newaxis])) / np.linalg.norm(F_p1[:,:2], axis=1)[:, np.newaxis] * l
 
     # Display points and segments of corresponding epipolar lines.
-    # You will see points in red corsses, epipolar lines in green 
+    # You will see points in red crosses, epipolar lines in green 
     # and a short cyan line that denotes the shortest distance between
     # the epipolar line and the corresponding point.
     
@@ -258,16 +258,16 @@ def visualize(estimated_F, img1, img2, kp1, kp2):
     plt.subplot(1, 2, 1)
     plt.imshow(img1, cmap='gray')
     plt.plot(kp1[:,0], kp1[:,1],  '+r')
-    plt.plot([kp1[:,0], all_p1_closest[:,0]],[kp1[:,1], all_p1_closest[:,1]], 'r')
     plt.plot([all_p1_src[:,0], all_p1_dst[:,0]],[all_p1_src[:,1], all_p1_dst[:,1]], 'g')
+    plt.plot([kp1[:,0], all_p1_closest[:,0]],[kp1[:,1], all_p1_closest[:,1]], 'c')
     plt.xlim(0, img1.shape[1])
     plt.ylim(img1.shape[0], 0)
 
     plt.subplot(1, 2, 2)
     plt.imshow(img2, cmap='gray')
     plt.plot(kp2[:,0], kp2[:,1],  '+r')
-    plt.plot([kp2[:,0], all_p2_closest[:,0]],[kp2[:,1], all_p2_closest[:,1]], 'r')
     plt.plot([all_p2_src[:,0], all_p2_dst[:,0]],[all_p2_src[:,1], all_p2_dst[:,1]], 'g')
+    plt.plot([kp2[:,0], all_p2_closest[:,0]],[kp2[:,1], all_p2_closest[:,1]], 'c')
     plt.xlim(0, img2.shape[1])
     plt.ylim(img2.shape[0], 0)
     
@@ -275,7 +275,7 @@ def visualize(estimated_F, img1, img2, kp1, kp2):
     # --------------------------- End your code here   ---------------------------------------------
 
 all_good_matches = np.load('assets/all_good_matches.npy')
-F_Q2 = F_with_normalization # link to your estimated F in Q3
+F_Q2 = F_with_normalization # link to your estimated F in Q2
 F_Q3 = best_F # link to your estimated F in Q3
 visualize(F_Q2, img1, img2, all_good_matches[:, :2], all_good_matches[:, 2:])
 visualize(F_Q3, img1, img2, all_good_matches[:, :2], all_good_matches[:, 2:])

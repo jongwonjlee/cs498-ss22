@@ -1,4 +1,5 @@
 from email.mime import base
+import enum
 import random
 from turtle import left
 import numpy as np
@@ -35,8 +36,16 @@ plt.show()
 # You only need to modify K1 and K2 here, if necessary. If you think they remain the same, leave here as blank and explain why.
 # --------------------------- Begin your code here ---------------------------------------------
 
+np.set_printoptions(suppress=True)
+
+print("K1 (unscaled): \n", K1)
+print("K2 (unscaled): \n", K2)
+
 K1[:2, :] //= scale
 K2[:2, :] //= scale
+
+print("K1 (scaled): \n", K1)
+print("K2 (scaled): \n", K2)
 
 # --------------------------- End your code here   ---------------------------------------------
 
@@ -95,8 +104,8 @@ def stereo_matching_ssd(left_im, right_im, max_disp=128, block_size=21):
        right_gray[:, :w+min(block_size-1, block_size//2+d)-block_size//2-d]
 
   # create strided arrays
-  # left_gray_strided[i,j] indicates (block_size, block_size) np.array around left_gray[i,j]
-  # right_gray_strided[i,j,d] indicates (block_size, block_size) np.array around right_gray[i,j]
+  # left_gray_strided[j,i] indicates (block_size, block_size) np.array around left_gray[i,j]
+  # right_gray_strided[j,i,d] indicates (block_size, block_size) np.array around right_gray[i,j]
   from numpy.lib.stride_tricks import as_strided
 
   left_gray_strided = np.empty(shape=left_gray.shape+(block_size,block_size), dtype=left_gray.dtype)
@@ -107,18 +116,18 @@ def stereo_matching_ssd(left_im, right_im, max_disp=128, block_size=21):
     right_gray_strided[:,:,d,:,:] = as_strided(right_gray_padded[:,:,d], shape=right_gray.shape+(block_size,block_size), strides=right_gray_padded.strides[:-1]*2)
 
   # compute squared sum of distance
-  # disp_map_candidate[y,x,d] indicates the ssd at (y,x) with a disparity offset d
+  # disp_map_candidate[j,i,d] indicates the ssd at (j,i) with a disparity offset d
   # disp_map_candidate = np.einsum('ijmn,ijdmn->ijd', left_gray_strided, right_gray_strided)
-  disp_map_candidate = np.einsum('ijdmn,ijdmn->ijd', right_gray_strided-left_gray_strided[:,:,np.newaxis], right_gray_strided-left_gray_strided[:,:,np.newaxis])
-  # disp_map_candidate = np.empty(shape=left_gray.shape+(max_disp,), dtype=np.int64)
-  # for d in range(max_disp):
-  #   for j in range(h):
-  #     for i in range(w):
-  #       disp_map_candidate[j,i,d] = ((left_gray_strided[j,i] - right_gray_strided[j,i,d])**2).sum()
+  # disp_map_candidate = np.einsum('ijdmn,ijdmn->ijd', right_gray_strided-left_gray_strided[:,:,np.newaxis], right_gray_strided-left_gray_strided[:,:,np.newaxis])
+  disp_map_candidate = np.empty(shape=left_gray.shape+(max_disp,), dtype=np.int64)
+  for d in range(max_disp):
+    for j in range(h):
+      for i in range(w):
+        disp_map_candidate[j,i,d] = ((left_gray_strided[j,i] - right_gray_strided[j,i,d])**2).sum()
   
 
   # extract disparity
-  # disp_map[y,x] indicates the disparity of two images at (y,x)
+  # disp_map[j,i] indicates the disparity of two images at (j,i)
   disp_map = np.argmin(disp_map_candidate, axis=2)
   
   # to avoid zero-division, covert zero elements to be -1
@@ -154,31 +163,41 @@ plt.show()
 
 
 # --------------------------- Begin your code here ---------------------------------------------
-xyz = None
-color = None
 
+# import RGB info pixelwise 
+color = (cv2.cvtColor(left_img, cv2.COLOR_BGR2RGB)).astype(np.float64).reshape(-1, 3)
+
+# cast non-positive disparities to nan
+disparity[np.where(disparity==-1)] == np.nan
+disparity_cv2[np.where(disparity_cv2==-1)] == np.nan
+
+# read baseline and focal length
 baseline = np.linalg.norm(t)
-f = K1[0,0]
+f = np.linalg.norm(np.diag(K1)[:-1])
 
+# generate meshgrid in a normalized image coordinate
 U, V = np.meshgrid(np.arange(w)-w//2, np.arange(h)-h//2)
-Z = baseline / disparity * f
-X = Z / f * U
-Y = Z / f * V
-
-xyz = np.stack([X,Y,Z], axis=2)
-color = left_img
-
-xyz = np.reshape(xyz, (-1, 3))
-color = np.reshape(color, (-1, 3))
-
-dists = np.linalg.norm(xyz, axis=1)
-idx = np.where(dists < 20.0)[0]
-xyz = xyz[idx]; color = color[idx]
 
 fig = plt.figure()
-ax = fig.add_subplot(111, projection='3d')
-ax.scatter(xyz[:, 0], xyz[:, 1], xyz[:, 2], c='b', label='Points')
-ax.legend(loc='best')
+
+for i, disp in enumerate([disparity, disparity_cv2]):
+  # project pointclouds in 3d space upon estimated disparity
+  Z = baseline / disp * f
+  X = Z / f * U
+  Y = -Z / f * V
+  
+  # create position and corresponding color for projected 3d points
+  xyz = np.stack([X,Y,Z], axis=2)
+  xyz = np.reshape(xyz, (-1, 3))
+
+  # draw 3d points with corresponding color
+  ax = fig.add_subplot(f'12{i+1}', projection='3d')
+  ax.scatter(xyz[:, 2], xyz[:, 0], xyz[:, 1], c=color/255.0, label='Points')
+  ax.legend(loc='best')
+  ax.view_init(azim=-145, elev=30)
+  ax.set_xlim((6, 15))
+  ax.set_ylim((-5, 5))
+  ax.set_zlim((-4, 4))
 
 plt.show()
 

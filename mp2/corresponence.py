@@ -16,7 +16,7 @@ import cv2 # our tested version is 4.5.5
 import numpy as np
 from matplotlib import pyplot as plt
 from pathlib import Path
-import scipy
+import scipy.spatial
 
 basedir= Path('assets/fountain')
 img1 = cv2.imread(str(basedir / 'images/0000.png'), 0)
@@ -74,7 +74,7 @@ def select_putative_matches(des1, des2):
     
     # --------------------------- End your code here   ---------------------------------------------
     
-    def lowe_ratio_test(matches, ratio=5.0):
+    def lowe_ratio_test(matches, ratio=3.0):
         """
         run lowe ratio test to filter out 
         Arguments: 
