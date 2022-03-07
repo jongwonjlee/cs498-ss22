@@ -17,6 +17,9 @@
 \evensidemargin -.25in
 \textwidth 7in
 
+\graphicspath{ {./imgs/}
+               {../} }
+
 \begin{document}
 
 % ========== Edit your name here
@@ -90,7 +93,7 @@ Note that indices of matching candidates for every keypoint are sorted from the 
 
 \begin{figure}[h]
     \centering
-    \includegraphics[width=1.0\linewidth]{figs/putative_matches.png}
+    \includegraphics[width=1.0\linewidth]{putative_matches.png}
     \caption{Putative matches after passing Lowe's ratio test.}
     \label{fig:putative_matches}
 \end{figure}
@@ -264,11 +267,11 @@ Fig.~\ref{fig:ransac} is the visualized inlier keypoints with respect to the num
 
 \begin{figure}[h]
     \centering
-    \includegraphics[height=7.5cm]{figs/ransac_num_iter_1e0.png} % width=1.0\linewidth
+    \includegraphics[height=7.5cm]{ransac_num_iter_1e0.png} % width=1.0\linewidth
     \caption{Inlier keypoints with the estimated fundamental matrix from RANSAC (iteration: 1e0)}
-    \includegraphics[height=7.5cm]{figs/ransac_num_iter_1e2.png}
+    \includegraphics[height=7.5cm]{ransac_num_iter_1e2.png}
     \caption{Inlier keypoints with the estimated fundamental matrix from RANSAC (iteration: 1e2)}
-    \includegraphics[height=7.5cm]{figs/ransac_num_iter_1e4.png}
+    \includegraphics[height=7.5cm]{ransac_num_iter_1e4.png}
     \caption{Inlier keypoints with the estimated fundamental matrix from RANSAC (iteration: 1e4)}
     \label{fig:ransac}
 \end{figure}
@@ -362,14 +365,14 @@ F_Q3 = best_F               # estimated F in Q3
 
 \begin{figure}[h]
     \centering
-    \includegraphics[width=1.0\linewidth]{figs/epipolar_lines_8pts.png}
+    \includegraphics[width=1.0\linewidth]{epipolar_lines_8pts.png}
     \caption{Keypoints and epipolar lines from a fundamental matrix estimated by eight-point algorithm}
     \label{fig:epipolar_lines_8pts}
 \end{figure}
 
 \begin{figure}[h]
     \centering
-    \includegraphics[width=1.0\linewidth]{figs/epipolar_lines_ransac.png}
+    \includegraphics[width=1.0\linewidth]{epipolar_lines_ransac.png}
     \caption{Keypoints and epipolar lines from a fundamental matrix estimated by RANSAC}
     \label{fig:epipolar_lines_ransac}
 \end{figure}
@@ -464,7 +467,7 @@ Note that the the center of camera in the given 3D world frame is estimated. The
 
 \begin{figure}[h]
     \centering
-    \includegraphics[width=1.0\linewidth]{figs/triangulation.png}
+    \includegraphics[width=1.0\linewidth]{triangulation.png}
     \caption{Keypoints estimated by triangulation along with cameras in a 3-D frame}
     \label{fig:triangulation}
 \end{figure}
@@ -596,7 +599,7 @@ Fig.~\ref{fig:disparity_ssd} shows the estimated disparity map from our implemen
 
 \begin{figure}[h]
     \centering
-    \includegraphics[width=1.0\linewidth]{figs/disparity_ssd.png}
+    \includegraphics[width=1.0\linewidth]{disparity_ssd.png}
     \caption{Disparity estimates from our implementation.}
     \label{fig:disparity_ssd}
 \end{figure}
@@ -612,7 +615,7 @@ Fig.~\ref{fig:disparity_comparison} compares the disparity map from our implemen
 
 \begin{figure}[h]
     \centering
-    \includegraphics[width=1.0\linewidth]{figs/disparity_comparison.png}
+    \includegraphics[width=1.0\linewidth]{disparity_comparison.png}
     \caption{Disparity estimates from our implementation (left) and from the off-the-shelf function (right).}
     \label{fig:disparity_comparison}
 \end{figure}
@@ -678,7 +681,7 @@ Fig.~\ref{fig:disparity2pcd} compares the reconstructed 3D points from the dispa
 
 \begin{figure}[h]
     \centering
-    \includegraphics[width=1.0\linewidth]{figs/disparity_to_pointcloud.png}
+    \includegraphics[width=1.0\linewidth]{disparity_to_pointcloud.png}
     \caption{Pointclouds from disparity estimates of our implementation (left) and of the off-the-shelf function (right).}
     \label{fig:disparity2pcd}
 \end{figure}
