@@ -1,7 +1,7 @@
 from re import I
 import numpy as np
 import open3d as o3d
-from icp_sol import read_data, icp, rgbd2pts
+from icp import read_data, icp, rgbd2pts
 
 
 def odometry_error(T_W2Cs_pred, T_W2Cs_gt):
