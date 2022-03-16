@@ -4,21 +4,88 @@ import cv2
 import numpy as np
 import open3d as o3d
 import time
+from pyparsing import col
 from sklearn.neighbors import KDTree
 
 # Question 4: deal with point_to_plane = True
-def fit_rigid(src, tgt, point_to_plane = False):
+def fit_rigid(src, tgt, point_to_plane=False, src_normal=None, dst_normal=None):
   # Question 2: Rigid Transform Fitting
   # Implement this function
   # -------------------------
+
+  assert len(src) == len(tgt)
+
   T = np.identity(4)
+  
+  # point-to-point algorithm
+  # https://igl.ethz.ch/projects/ARAP/svd_rot.pdf
+  if not point_to_plane:
+    # assume that weights are equal
+    # calculate centroid
+    src_avg = np.mean(src, axis=0)
+    tgt_avg = np.mean(tgt, axis=0)
+    
+    # construct 3x3 covariance matrix
+    C = (src - src_avg).T @ (tgt - tgt_avg)
+    
+    # do svd 
+    U, S, Vh = np.linalg.svd(C)
+    
+    # reconstruct rotation matrix
+    M = np.eye(3)
+    M[2,2] = np.linalg.det(Vh.T @ U.T)
+    
+    R = Vh.T @ M @ U.T
+
+    # reconstruct translation matrix
+    t = tgt_avg - R @ src_avg
+    
+    # write on SE(3) matrix
+    T[:3,:3] = R
+    T[:3,-1] = t
+
+  # point-to-plane algorithm
+  # https://www.cs.princeton.edu/~smr/papers/icpstability.pdf
+  else:
+    A = np.empty((6*len(src), 6))
+    b = np.empty(6*len(src))
+
+    # construct overdetermined linear system
+    for i, (p,q,n) in enumerate(zip(src,tgt,src_normal)):
+      c = np.cross(p,n)
+      v = np.concatenate([c,n])
+      A[6*i:6*(i+1)] = np.outer(v,v)
+      b[6*i:6*(i+1)] = - v * np.inner(p-q, n)
+    
+    # get solution to the overdetermined system
+    x = np.linalg.lstsq(A, b, rcond=None)[0]
+
+    # recover translation
+    t = x[3:]
+
+    # recover rotation
+    a, b, c = x[:3]
+    R = np.array([[1,-c,b],
+                  [c,1,-a],
+                  [-b,a,1]])
+    from scipy.spatial.transform import Rotation
+    rot = Rotation.from_matrix(R)
+    R = Rotation.as_matrix(rot)
+
+    # write on SE(3) matrix
+    T[:3,:3] = R
+    T[:3,-1] = t
+  
   # -------------------------
   return T
 
 # Question 4: deal with point_to_plane = True
-def icp(source, target, init_pose=np.eye(4), max_iter = 20, point_to_plane = False):
-  src = np.asarray(source.points).T
-  tgt = np.asarray(target.points).T
+def icp(source, target, init_pose=np.eye(4), max_iter = 20, point_to_plane = False, inlier_thres=0.1):
+  src = np.asarray(source.points)
+  tgt = np.asarray(target.points)
+
+  src_normal = np.asarray(source.normals)
+  tgt_normal = np.asarray(target.normals)
 
   # Question 3: ICP
   # Hint 1: using KDTree for fast nearest neighbour
@@ -36,6 +103,22 @@ def icp(source, target, init_pose=np.eye(4), max_iter = 20, point_to_plane = Fal
 
     T_delta = np.identity(4)
 
+    # construct kd tree
+    tree = KDTree(src)
+    # find corresponding pairs (the nearest)
+    dist, idx = tree.query(tgt, k=1)
+    dist = dist.flatten(); idx = idx.flatten()
+    # count inlier ratio
+    inlier_ratio = len(np.where(dist < inlier_thres)[0]) / len(tgt)
+
+    # find incremental transformation matrix
+    T_delta = fit_rigid(src[idx], tgt, point_to_plane=point_to_plane, \
+                        src_normal=src_normal[idx], dst_normal=tgt_normal)
+    # update total transformation matrix
+    T = T_delta @ T
+    # update src points
+    src = (T_delta @ np.c_[src, np.ones(len(src))].T)[:3, :].T
+
     # ---------------------------------------------------
 
     if inlier_ratio > 0.999:
@@ -52,14 +135,28 @@ def rgbd2pts(color_im, depth_im, K):
   # Question 1: unproject rgbd to color point cloud, provide visualiation in your document
   # Your implementation between the lines
   # ---------------------------
-  N = 0 # todo
-  color = np.zeros((N, 3))
-  xyz = np.zeros((N, 3))
+
+  # read image size 
+  h, w = depth_im.shape 
+  # read camera intrinsics
+  f = np.linalg.norm(np.diag(K)[:-1])
+  px, py = K[0:2,2]
+
+  # convert depth data into 3d coordinate
+  U, V = np.meshgrid(np.arange(w)-int(px), np.arange(h)-int(py))
+  X = U * depth_im / f
+  Y = V * depth_im / f
+  
+  # create 3d pointcloud and color data
+  xyz = np.stack([X,Y,depth_im], axis=2)
+  xyz = xyz.reshape((-1,3))
+  color = color_im.reshape((-1,3))
+  
   # ---------------------------
   
   pcd = o3d.geometry.PointCloud()
-  pcd.points = o3d.utility.Vector3dVector(xyz.T)
-  pcd.colors = o3d.utility.Vector3dVector(color.T)
+  pcd.points = o3d.utility.Vector3dVector(xyz)
+  pcd.colors = o3d.utility.Vector3dVector(color)
   return pcd
 
 # TODO (Shenlong): please check that I set this question up correctly, it is called on line 136
@@ -69,6 +166,14 @@ def pose_error(estimated_pose, gt_pose):
   # Your implementation between the lines
   # ---------------------------
   error = 0
+
+  error_trn = np.linalg.norm(estimated_pose[:3, -1] - gt_pose[:3, -1])
+  error_rot = np.arccos((np.trace(estimated_pose[:3,:3] @ gt_pose[:3,:3].T) - 1) / 2)
+  
+  print(f" -- translation error: {error_trn} [m]")
+  print(f" -- rotation error   : {error_rot} [rad]")
+  
+  error = (error_trn, error_rot)
   # ---------------------------
   return error
 
@@ -99,7 +204,8 @@ if __name__ == "__main__":
   target.estimate_normals(search_param=o3d.geometry.KDTreeSearchParamHybrid(radius=0.1, max_nn=30))
 
   # conduct ICP (your code)
-  final_Ts, delta_Ts = icp(source, target)
+  # TODO (JONGWON): CHANGE PARAMETER point_to_plane
+  final_Ts, delta_Ts = icp(source, target, point_to_plane=True)
 
   # visualization
   vis = o3d.visualization.Visualizer()
@@ -136,6 +242,10 @@ if __name__ == "__main__":
   print("Ground truth pose:", gt_pose)
   print("Estimated pose:", pred_pose)
   print("Rotation/Translation Error", p_error)
+
+  # TODO (JONGWON): SANITY CHECK AGAIN
+  p_raw = pose_error(np.eye(4), gt_pose)
+  print("Rotation/Translation Error (before)", p_raw)
 
   tgt_cam.paint_uniform_color((1, 0, 0))
   src_cam.paint_uniform_color((0, 1, 0))
