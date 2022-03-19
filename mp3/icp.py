@@ -1,3 +1,4 @@
+from os import fwalk
 from re import I
 import time
 import cv2
@@ -80,7 +81,7 @@ def fit_rigid(src, tgt, point_to_plane=False, src_normal=None, dst_normal=None):
   return T
 
 # Question 4: deal with point_to_plane = True
-def icp(source, target, init_pose=np.eye(4), max_iter = 20, point_to_plane = False, inlier_thres=0.1):
+def icp(source, target, max_iter=20, point_to_plane=False, inlier_thres=0.1):
   src = np.asarray(source.points)
   tgt = np.asarray(target.points)
 
@@ -92,17 +93,14 @@ def icp(source, target, init_pose=np.eye(4), max_iter = 20, point_to_plane = Fal
   # Hint 3: you should be calling fit_rigid inside the loop
   # You implementation between the lines
   # ---------------------------------------------------
-  T = init_pose
-  transforms = []
-  delta_Ts = []
+  T = np.eye(4)     # initial guess of transformation matrix 
+  transforms = []   # total transformation after every iteration
+  delta_Ts = []     # incremental transformation for every iteration
 
   inlier_ratio = 0
   print("iter %d: inlier ratio: %.2f" % (0, inlier_ratio))
 
   for i in range(max_iter):
-
-    T_delta = np.identity(4)
-
     # construct kd tree
     tree = KDTree(src)
     # find corresponding pairs (the nearest)
@@ -171,7 +169,7 @@ def pose_error(estimated_pose, gt_pose):
   error_rot = np.arccos((np.trace(estimated_pose[:3,:3] @ gt_pose[:3,:3].T) - 1) / 2)
   
   print(f" -- translation error: {error_trn} [m]")
-  print(f" -- rotation error   : {error_rot} [rad]")
+  print(f" -- rotation error   : {np.rad2deg(error_rot)} [deg]")
   
   error = (error_trn, error_rot)
   # ---------------------------
@@ -205,7 +203,7 @@ if __name__ == "__main__":
 
   # conduct ICP (your code)
   # TODO (JONGWON): CHANGE PARAMETER point_to_plane
-  final_Ts, delta_Ts = icp(source, target, point_to_plane=True)
+  final_Ts, delta_Ts = icp(source, target, point_to_plane=False)
 
   # visualization
   vis = o3d.visualization.Visualizer()
@@ -244,8 +242,8 @@ if __name__ == "__main__":
   print("Rotation/Translation Error", p_error)
 
   # TODO (JONGWON): SANITY CHECK AGAIN
-  p_raw = pose_error(np.eye(4), gt_pose)
-  print("Rotation/Translation Error (before)", p_raw)
+  # p_raw = pose_error(np.eye(4), gt_pose)
+  # print("Rotation/Translation Error (before)", p_raw)
 
   tgt_cam.paint_uniform_color((1, 0, 0))
   src_cam.paint_uniform_color((0, 1, 0))
