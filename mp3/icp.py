@@ -9,7 +9,7 @@ from pyparsing import col
 from sklearn.neighbors import KDTree
 
 # Question 4: deal with point_to_plane = True
-def fit_rigid(src, tgt, point_to_plane=False, src_normal=None, dst_normal=None):
+def fit_rigid(src, tgt, point_to_plane=False, src_normal=None):
   # Question 2: Rigid Transform Fitting
   # Implement this function
   # -------------------------
@@ -111,7 +111,7 @@ def icp(source, target, max_iter=20, point_to_plane=False, inlier_thres=0.1):
 
     # find incremental transformation matrix
     T_delta = fit_rigid(src[idx], tgt, point_to_plane=point_to_plane, \
-                        src_normal=src_normal[idx], dst_normal=tgt_normal)
+                        src_normal=src_normal[idx])
     # update total transformation matrix
     T = T_delta @ T
     # update src points
@@ -168,8 +168,8 @@ def pose_error(estimated_pose, gt_pose):
   error_trn = np.linalg.norm(estimated_pose[:3, -1] - gt_pose[:3, -1])
   error_rot = np.arccos((np.trace(estimated_pose[:3,:3] @ gt_pose[:3,:3].T) - 1) / 2)
   
-  print(f" -- translation error: {error_trn} [m]")
-  print(f" -- rotation error   : {np.rad2deg(error_rot)} [deg]")
+  print(f" -- translation error: {error_trn:.4f} [m]")
+  print(f" -- rotation error   : {np.rad2deg(error_rot):.4f} [deg]")
   
   error = (error_trn, error_rot)
   # ---------------------------
@@ -203,7 +203,7 @@ if __name__ == "__main__":
 
   # conduct ICP (your code)
   # TODO (JONGWON): CHANGE PARAMETER point_to_plane
-  final_Ts, delta_Ts = icp(source, target, point_to_plane=False)
+  final_Ts, delta_Ts = icp(source, target, point_to_plane=True)
 
   # visualization
   vis = o3d.visualization.Visualizer()
@@ -237,8 +237,9 @@ if __name__ == "__main__":
   gt_pose = np.linalg.inv(T_src) @ T_tgt
   pred_pose = np.linalg.inv(final_Ts[-1])
   p_error = pose_error(pred_pose, gt_pose)
-  print("Ground truth pose:", gt_pose)
-  print("Estimated pose:", pred_pose)
+  np.set_printoptions(precision=4)
+  print("Ground truth pose:\n", gt_pose)
+  print("Estimated pose:\n", pred_pose)
   print("Rotation/Translation Error", p_error)
 
   # TODO (JONGWON): SANITY CHECK AGAIN
