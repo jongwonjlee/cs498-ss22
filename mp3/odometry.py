@@ -5,6 +5,7 @@ from turtle import st
 import numpy as np
 import open3d as o3d
 from sympy import im
+from urllib3 import Retry
 from icp import read_data, icp, rgbd2pts, pose_error
 
 
@@ -61,7 +62,6 @@ for frame in range(step, end, step):
   final_Ts, _ = icp(source_down, target_down, inlier_thres=0.01)
   T_inc =  final_Ts[-1]
   # update latest camera pose wrt world frame
-  # TODO (JONGWON) RECHECK THE COORDINATE CONVENTION
   T_W2C = np.linalg.inv(T_inc) @ T_W2C
   
   pred_poses[frame] = T_W2C
@@ -99,29 +99,36 @@ o3d.visualization.draw_geometries(vis_list,
 # Your code
 # ------------------------
 
-from scipy.spatial.transform import Rotation
-assert len(pred_poses) == len(gt_poses)
+## function calculating relative trajectory error framewise
+def get_rte(pred_poses, gt_poses):
+  from scipy.spatial.transform import Rotation
+  assert len(pred_poses) == len(gt_poses)
 
-rte_rot = 0
-rte_trn = 0
+  rte_rot = 0
+  rte_trn = 0
 
-for frame in range(step, end, step):
-  delT_pred = pred_poses[frame] @ np.linalg.inv(pred_poses[frame-step])
-  delT_gt = gt_poses[frame] @ np.linalg.inv(gt_poses[frame-step])
-  delT_pred_gt = delT_pred @ np.linalg.inv(delT_gt)
-  
-  t = delT_pred_gt[:3,-1]
-  R = delT_pred_gt[:3,:3]
-  rot = Rotation.from_matrix(R)
-  
-  rte_rot += rot.magnitude()
-  rte_trn += np.linalg.norm(t)
+  for frame in range(step, end, step):
+    delT_pred = pred_poses[frame] @ np.linalg.inv(pred_poses[frame-step])
+    delT_gt = gt_poses[frame] @ np.linalg.inv(gt_poses[frame-step])
+    delT_pred_gt = delT_pred @ np.linalg.inv(delT_gt)
+    
+    t = delT_pred_gt[:3,-1]
+    R = delT_pred_gt[:3,:3]
+    rot = Rotation.from_matrix(R)
+    
+    rte_rot += rot.magnitude()
+    rte_trn += np.linalg.norm(t)
 
-rte_rot /= (len(gt_poses)-1)
-rte_trn /= (len(gt_poses)-1)
+  rte_rot /= (len(gt_poses)-1)
+  rte_trn /= (len(gt_poses)-1)
 
-print(f" -- RTE (translation): {rte_trn:.2f} [m]  ")
-print(f" -- RTE (rotation)   : {np.rad2deg(rte_rot):.2f} [deg]")
+  print(f" -- RTE (translation): {rte_trn:.2f} [m]  ")
+  print(f" -- RTE (rotation)   : {np.rad2deg(rte_rot):.2f} [deg]")
+
+  return rte_trn, rte_rot
+
+## report RTE of the aforementioned odometry result
+get_rte(pred_poses, gt_poses)
 
 # ------------------------
 
@@ -145,11 +152,11 @@ final_Ts, delta_Ts = icp(source_down, target_down, max_iter=50)
 
 T_0 = pred_poses[0]
 T_40 = pred_poses[40]
-print("Relative transfrom from ICP:", np.linalg.inv(final_Ts[-1]))
-print("Relative transfrom from odometry:", T_40)
+print("Relative transfrom from ICP:\n", np.linalg.inv(final_Ts[-1]))
+print("Relative transfrom from odometry:\n", T_40)
 
 p_error = pose_error(np.linalg.inv(final_Ts[-1]), T_40)
-print("Rotation/Translation Error", p_error)
+print("Rotation/Translation Error: \n", p_error)
 
 # Question 8: to ensure the consistency, we could build a pose graph to further improve the performance.
 # Each node is the a camera pose
@@ -255,6 +262,7 @@ for i, src_id in enumerate(frame_list):
       # run icp between frame i and j (i+k)
       # final_Ts, _ = icp(pcds[src_id], pcds[tgt_id], inlier_thres=0.01)
       # T_i2j =  final_Ts[-1]
+      # transformation_icp =  final_Ts[-1]
       transformation_icp, information_icp = pairwise_registration(pcds[src_id], pcds[tgt_id])
 
       # add an edge
@@ -277,9 +285,16 @@ with o3d.utility.VerbosityContextManager(o3d.utility.VerbosityLevel.Debug) as cm
         option)
 
 # return optimized nodes
-# for i, frame_id in enumerate(frame_list):
-#   T_i2W = pose_graph.nodes[i].pose
-#   pred_poses[frame_id] = np.linalg.inv(T_i2W)
+opt_poses = {}
+for i, frame_id in enumerate(frame_list):
+  T_i2W = pose_graph.nodes[i].pose
+  opt_poses[frame_id] = np.linalg.inv(T_i2W)
+
+### report RTEs
+print(" -- RTE of odometry:")
+get_rte(pred_poses, gt_poses)
+print(" -- RTE of graph optimization:")
+get_rte(opt_poses, gt_poses)
 
 
 print("Transform points and display")
@@ -288,8 +303,8 @@ for point_id in range(len(pcds)):
     point_frame = frame_list[point_id]
     pcds[point_frame].transform(pose_graph.nodes[point_id].pose)
     # optimized pose: green
-    T_C2W = pose_graph.nodes[point_id].pose
-    pgo_cam = o3d.geometry.LineSet.create_camera_visualization(w, h, K, np.linalg.inv(T_C2W), scale = 0.1)
+    # T_C2W = pose_graph.nodes[point_id].pose
+    pgo_cam = o3d.geometry.LineSet.create_camera_visualization(w, h, K, opt_poses[point_frame], scale = 0.1)
     pgo_cam.paint_uniform_color((0, 1, 0))
     # gt pose: red
     gt_cam = o3d.geometry.LineSet.create_camera_visualization(w, h, K, gt_poses[point_frame], scale = 0.1)
