@@ -287,11 +287,9 @@ The final aligned source and target pointclouds upon the point-to-plane ICP algo
 \color{red}
 %% TODO: FILL HERE
 
-Please justify when point-to-plane might be preferred over point-to-point distances (provide mathematical justification if necessary).
+% Please justify when point-to-plane might be preferred over point-to-point distances (provide mathematical justification if necessary).
 
-\begin{itemize}
-    \item 
-\end{itemize}
+Instead of minimizing point-to-point distance, the point-to-plane algorithm minimizes error along the surface normal (i.e. align the directional vector between a pair of points to the surface normal); which lets flat regions slide along each other. It has come into widespead due to its accurate and robust outcome compared to the original version under the assumption that the given surface normal information is reliable enough. However, if the surface normal is inferior, it may make the overall ICP performance worse than the vanilla algorithm.
 
 \end{quote}
 
