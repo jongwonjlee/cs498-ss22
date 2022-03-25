@@ -40,7 +40,7 @@
 % ========== Edit your name here
 \author{Due by 11:59pm Friday, Mar 25th 2022}
 \title{CS 498: Assignment 3: Iterative Closest Point and Odometry}
-\date{March 4, 2022}
+\date{March 25, 2022}
 \maketitle
 
 \medskip
@@ -152,15 +152,72 @@ def fit_rigid(src, tgt, point_to_plane=False, src_normal=None):
     return T
 \end{lstlisting}
 
-The overall logic comes from [\href{https://igl.ethz.ch/projects/ARAP/svd_rot.pdf}{here}]. Given corresponding pairs of pointcloud date, the rotation matrix is calculated by SVD first. Then, the translation between two sets of pointclouds is obtained from the aforementioned rotation matrix estimate and the their centroids. In conclusion, the $SE(3)$ matrix transforming the coordinate from that of \texttt{src} to that of \texttt{tgt} is returned.
+The overall logic comes from [\href{https://igl.ethz.ch/projects/ARAP/svd_rot.pdf}{here}]. Given corresponding pairs of pointcloud data, the rotation matrix is calculated by SVD first. Then, the translation between two sets of pointclouds is obtained from the aforementioned rotation matrix estimate and the their centroids. In conclusion, the $SE(3)$ matrix transforming the coordinate from that of \texttt{src} to that of \texttt{tgt} is returned.
 
-\color{red}
-%% TODO: FILL HERE
-In addition, please provide an answer and necessary mathematical justification on what will happen if the input corresponding point pair contains errors and whether you could identify such situation.
+% In addition, please provide an answer and necessary mathematical justification on what will happen if the input corresponding point pair contains errors and whether you could identify such situation.
 
-\begin{itemize}
-    \item 
-\end{itemize}
+If the input corresponding pairs contain errors---hence if the pairs are mismatched, the magnitude of diagonals of 3x3 covariance matrix \texttt{C = (src - src\_avg).T @ (tgt - tgt\_avg)} becomes small. This is due to the reason that the distributions of \texttt{src - src\_avg} and \texttt{tgt - tgt\_avg} should be the same in an ideal case. As the $(i,j)$th component of \texttt{C} is $C_{ij} = \sum_{k=1}^{N}(v_{k}(i)-\bar{v}_k(i))(w_{k}(j)-\bar{w}_k(j))$ (where $i,j \in \{ 1,2,3 \}$), the diagonals $C_{ii}$ is maximized when the pairs of \texttt{src} and \texttt{tgt} matches their order; otherwise, $C_{ii}$ is reduced. 
+
+Below shows an example code how the mismatching pairs in identical sets affect the resulting 3x3 covariance matrix. It is clear that the magnitude of diagonals decreases as the portion of mismatching pairs increases.
+
+\begin{lstlisting}[language=Python, basicstyle=\scriptsize]
+import numpy as np
+
+np.set_printoptions(precision=3)
+
+# create dummy data
+src = np.random.normal(0,1,size=(10000,3))
+
+for i in range(0,len(src)+len(src)//4,len(src)//4):
+    dst = src.copy()
+
+    # create indices to be shuffled
+    indices = np.random.choice(np.arange(len(src)), size=i)
+    indices_from = indices.copy()
+    np.random.shuffle(indices)
+    indices_to = indices.copy()
+
+    # get 3x3 covariance matrix of shuffled pairs
+    dst[indices_to] = src[indices_from]
+    C = src.T @ dst
+    U, S, Vh = np.linalg.svd(C)
+    print(f" -- portion of shuffled indices : {int(i/len(src)*100)} [%]")
+    print(f" -- covariance matrix : \n", C)
+
+    print("")
+\end{lstlisting}
+
+{\tt
+-- portion of shuffled indices : 0 [\%] \\
+-- covariance matrix : \\
+\lbrack \lbrack 9961.663  -120.71    -43.511 \rbrack \\
+\lbrack -120.71  10136.989   -35.24 \rbrack \\
+\lbrack  -43.511   -35.24   9994.62 \rbrack\rbrack
+
+-- portion of shuffled indices : 25 [\%] \\
+-- covariance matrix : \\
+\lbrack \lbrack 7667.496 -137.048 -151.385 \rbrack \\
+\lbrack -162.155 7913.338  -76.519 \rbrack \\
+\lbrack -222.77    26.505 7874.424 \rbrack \rbrack
+
+-- portion of shuffled indices : 50 [\%] \\
+-- covariance matrix : \\
+\lbrack \lbrack  6.059e+03 -7.391e+01 -1.082e+02 \rbrack \\
+\lbrack -1.810e+02  6.327e+03 -3.880e+01 \rbrack \\
+\lbrack -4.152e+00 -1.932e+02  5.970e+03 \rbrack \rbrack
+
+-- portion of shuffled indices : 75 [\%] \\
+-- covariance matrix : \\
+\lbrack \lbrack  4.607e+03 -1.542e+02 -3.022e+01 \rbrack \\
+\lbrack -8.709e+01  4.925e+03 -9.232e-01 \rbrack \\
+\lbrack -6.897e+01 -1.221e+02  4.763e+03 \rbrack \rbrack
+
+-- portion of shuffled indices : 100 [\%] \\
+-- covariance matrix : \\
+\lbrack \lbrack 3949.409   46.724   21.561 \rbrack \\
+\lbrack  -63.782 3716.365  -41.258 \rbrack \\
+\lbrack   82.969  105.936 3593.217 \rbrack \rbrack
+}
 
 \end{quote}
 
@@ -168,7 +225,7 @@ In addition, please provide an answer and necessary mathematical justification o
 \paragraph{Answer:} 
 \begin{quote}
 
-Below is the implentation of iterative closest point algorithm:
+Below is the implentation of the iterative closest point algorithm:
 
 \begin{lstlisting}[language=Python, basicstyle=\scriptsize]
 def icp(source, target, max_iter=20, point_to_plane=False, inlier_thres=0.1):
@@ -284,9 +341,6 @@ The final aligned source and target pointclouds upon the point-to-plane ICP algo
     \label{fig:pcds_icp_point2plane}
 \end{figure}
 
-\color{red}
-%% TODO: FILL HERE
-
 % Please justify when point-to-plane might be preferred over point-to-point distances (provide mathematical justification if necessary).
 
 Instead of minimizing point-to-point distance, the point-to-plane algorithm minimizes error along the surface normal (i.e. align the directional vector between a pair of points to the surface normal); which lets flat regions slide along each other. It has come into widespead due to its accurate and robust outcome compared to the original version under the assumption that the given surface normal information is reliable enough. However, if the surface normal is inferior, it may make the overall ICP performance worse than the vanilla algorithm.
@@ -325,16 +379,16 @@ Here, we report the translation and rotation error of running the point-to-point
 {\tt
 -- translation error: 0.0975 [m]    \\
 -- rotation error   : 3.5062 [deg]  \\
-Ground truth pose:  
-[[ 0.9983 -0.0386  0.043   0.0579]
-[ 0.0402  0.9985 -0.038   0.0361] 
-[-0.0415  0.0397  0.9984 -0.0679] 
-[ 0.      0.      0.      1.    ]] \\
-Estimated pose:
-[[ 0.9983  0.021   0.0546 -0.0335]
-[-0.0192  0.9993 -0.0324  0.0448]
-[-0.0553  0.0313  0.998  -0.1008]
-[ 0.      0.      0.      1.    ]]
+Ground truth pose:  \\
+\lbrack \lbrack  0.9983 -0.0386  0.043   0.0579 \rbrack \\
+\lbrack  0.0402  0.9985 -0.038   0.0361 \rbrack \\
+\lbrack -0.0415  0.0397  0.9984 -0.0679 \rbrack \\
+\lbrack  0.      0.      0.      1.     \rbrack \rbrack \\
+Estimated pose: \\
+\lbrack \lbrack  0.9983  0.021   0.0546 -0.0335 \rbrack \\
+\lbrack -0.0192  0.9993 -0.0324  0.0448 \rbrack \\
+\lbrack -0.0553  0.0313  0.998  -0.1008 \rbrack \\
+\lbrack  0.      0.      0.      1.     \rbrack \rbrack \\
 }
 
 Here, we report the translation and rotation error of running the point-to-plane ICP, along with its estimate and ground-truth.
@@ -343,16 +397,16 @@ Here, we report the translation and rotation error of running the point-to-plane
 {\tt
 -- translation error: 0.1247 [m]    \\
 -- rotation error   : 2.0591 [deg]  \\
-Ground truth pose:
-[[ 0.9983 -0.0386  0.043   0.0579]
-[ 0.0402  0.9985 -0.038   0.0361] 
-[-0.0415  0.0397  0.9984 -0.0679] 
-[ 0.      0.      0.      1.    ]]  \\
-Estimated pose:
-[[ 0.9971 -0.0381  0.066  -0.058 ]
-[ 0.0389  0.9992 -0.0102  0.0137] 
-[-0.0656  0.0128  0.9978 -0.108 ] 
-[ 0.      0.      0.      1.    ]]
+Ground truth pose:  \\
+\lbrack \lbrack  0.9983 -0.0386  0.043   0.0579 \rbrack \\
+\lbrack  0.0402  0.9985 -0.038   0.0361 \rbrack \\ 
+\lbrack -0.0415  0.0397  0.9984 -0.0679 \rbrack \\ 
+\lbrack  0.      0.      0.      1.     \rbrack \rbrack \\
+Estimated pose: \\
+\lbrack \lbrack  0.9971 -0.0381  0.066  -0.058  \rbrack \\
+\lbrack  0.0389  0.9992 -0.0102  0.0137 \rbrack \\
+\lbrack -0.0656  0.0128  0.9978 -0.108  \rbrack \\
+\lbrack  0.      0.      0.      1.     \rbrack \rbrack \\
 }
 
 It is observed that both ICP algorithms shows the translation error about an negative order of magnitude. The point-to-plane ICP demonstrates the better rotational error by 1 degree compared with the point-to-point ICP.
