@@ -113,6 +113,20 @@ def simple_predict(dataloader, model):
     return np.array(gts), np.array(preds), list(dataset.classes)
 \end{lstlisting}
 
+% prediction results
+{\centering \tt \small
+sky: AP: 0.60, IoU: 0.63 \\
+tree: AP: 0.15, IoU: 0.00 \\
+road: AP: 0.52, IoU: 0.96 \\
+grass: AP: 0.12, IoU: 0.00 \\
+water: AP: 0.18, IoU: 0.00 \\
+building: AP: 0.42, IoU: 0.54 \\
+mountain: AP: 0.01, IoU: 0.00 \\
+foreground: AP: 0.18, IoU: 0.26 \\
+misc: AP: 0.03, IoU: 0.00 \\
+mean: AP: 0.24, IoU: 0.27 \\
+}
+
 % outcome of simple prediction
 \begin{figure}[h]
     \centering
@@ -251,6 +265,9 @@ def train(model, optimizer, criterion, trainloader, device,
     # -------------------------
     return model
 \end{lstlisting}
+
+% TODO: EXPLAIN WHY IT IS IMPORTANT TO MONITOR BOTH TRAINING AND VALIDATION LOSSES.
+% TODO: WHEN LOSS NO LONGER IMPROVES, WHAT WE CAN DO?
 
 
 \paragraph{Question 6 (Model definition and training) [4 pt]:} 
@@ -442,7 +459,7 @@ def forward(self, x):
     return pred
 \end{lstlisting}
 
-% TODO: EXPLAIN WHY THOSE CONDITIONS AND HYPERPARAMETERS ARE CHOSEN
+% TODO: DESCRIBE BOTH MODELS IN DETAIL.
 
 % training code
 \begin{lstlisting}[language=Python, basicstyle=\scriptsize]
@@ -461,6 +478,8 @@ base_model = train(base_model, optimizer, criterion, dataloader, device,
                    epochs=50, scheduler=None, num_early_stop=np.nan)
 preds, gts = validate_model(val_dataloader, base_model, list(dataset.classes), device)
 \end{lstlisting}
+
+% TODO: EXPLAIN WHY THOSE CONDITIONS AND HYPERPARAMETERS ARE CHOSEN
 
 % logs of training & validation losses
 \begin{figure}[h]
@@ -499,6 +518,7 @@ misc: AP: 0.01, IoU: 0.09 \\
 mean: AP: 0.57, IoU: 0.60 \\
 }
 
+% TODO: ABLATION STUDY - EFFECT OF BATCHNORM ON TRAINING SPEED AND ACCURACY?
 
 \begin{figure}[h]
     \centering
@@ -618,6 +638,8 @@ def forward(self, x):
 
         return pred
 \end{lstlisting}
+
+% TODO: HOW DID I USE THE PRETRAINED MODEL?
 
 {\centering \tt \small
 \# ResnetBasedModel \\
