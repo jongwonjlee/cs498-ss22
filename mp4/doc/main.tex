@@ -41,6 +41,10 @@ Your submission should include your pdf and filled out mp4.ipynb.
 
 \paragraph{Question 1 (Data loading and augmentation)[1 pt]:}
 We provide code that loads the segmentation data. In this part you will need to perform data augmentation on the loaded data within the "SegmentationDataset" class. In particular you should take a random crop of the image and with some probability you should flip the image horizontally. You should experiment with different probabilities and crop sizes and report the results in your pdf. Make sure to use pytorch built in transforms methods.
+\paragraph{Answer:} 
+\begin{quote}
+
+Below is the implementation of \texttt{SegmentationDataset} class with random transform on the given image data for data augmentation.
 
 \begin{lstlisting}[language=Python, basicstyle=\scriptsize]
 if self.transform:
@@ -57,8 +61,11 @@ if random.random() < 0.5:
 # -------------------------
 \end{lstlisting}
 
+\texttt{transforms.RandomResizedCrop.get\_params()} generates transform parameters within the range of the given scaling factors (\texttt{scale}) and aspect ratio (\texttt{ratio}) parameters at random, where \texttt{i}, \texttt{j}, \texttt{h}, and \texttt{w} stands for the upper pixel coordinate, left pixel coordinate, height of the cropped image, and width of the cropped image, respectively. These parameters are applied to both \texttt{img} and \texttt{gt} so that both data can be transformed identically. Horizontal flipping is also applied by generating random number between 0 and 1 using \texttt{random.random()}; hence, the if statement \texttt{if random.random() < p} means the flipping is conducted with a chance of \texttt{p}. 
 
-% TODO: WHY I'VE CHOSEN SUCH PARAMETERS?
+Fig.~\ref{fig:transform} is comparison of transformed images (a) when no transform is applied, (b) scaling is applied (\texttt{scale=(0.08, 1.0)}), (c) aspect ratio is applied (\texttt{ratio=(3/4, 4/3)}), and (d) horizontal flipping is applied (\texttt{if random.random() < 0.5}). 
+
+I decided to use \texttt{scale=(0.8, 1.0)}, \texttt{ratio=(3/4, 4/3)}, and \texttt{random.random() < 0.5} for data augmentation by default, as those are also the default setup for data augmentation in the off-the-shelf Pytorch dataloader classes except for the scaling factor, which is \texttt{scale=(00.8, 1.0)}; this is because I hypothesize its lower bound in default (0.08) is small and hence may yield too tiny tranformed image to represent the semantic segmentation dataset for a successful training of the model that we are aiming for. 
 
 \begin{figure}[h]
     \centering
@@ -73,8 +80,14 @@ if random.random() < 0.5:
     \label{fig:transform}
 \end{figure}
 
+\end{quote}
+
 \paragraph{Question 2 (Simple Baseline) [2 pts]:} 
 In this part you will be modifying "simple\_train" and "simple\_predict". For each pixel you should compute the distribution of class labels at that pixel from the training dataset. When predicting classes for a new image, simply output these class frequencies at each pixel. You can run the evaluation code (from the next question) with your simple baseline and see its mean average precision which we provide - it should be around 24.
+\paragraph{Answer:} 
+\begin{quote}
+
+Below is the implementation of \texttt{simple\_train} function, which simply counts the frequencies of classes appearing on all images at every pixel accross the training dataset.
 
 \begin{lstlisting}[language=Python, basicstyle=\scriptsize]
 # Question 2
@@ -94,6 +107,7 @@ def simple_train(num_classes, train_dataloader):
     return model
 \end{lstlisting}
 
+Below is the implementation of \texttt{simple\_predict} function, which returns the outcome of the aforementioned \texttt{model} along with ground truths given the test dataset. Note that it returns the same prediction regardless of the query images being tested.
 
 \begin{lstlisting}[language=Python, basicstyle=\scriptsize]
 # Output:
@@ -112,6 +126,8 @@ def simple_predict(dataloader, model):
         # -------------------------
     return np.array(gts), np.array(preds), list(dataset.classes)
 \end{lstlisting}
+
+Below table shows the reported average precision (AP) and intersection of unit (IoU) of the prediction in the aforementioned \texttt{simple\_train()} model across all nine classes, along with its visualization in Fig.~\ref{fig:simple-predict}. Note that the mean average precision (mAP) is reported as 0.24, which is in line with the given information brought up in the question. Also, the visualization results poorly distinguishes different classes such as sky, tree, or ground. Again, this is less meaningful as all queries should return the same outcome.
 
 % prediction results
 {\centering \tt \small
@@ -135,8 +151,14 @@ mean: AP: 0.24, IoU: 0.27 \\
     \label{fig:simple-predict}
 \end{figure}
 
+\end{quote}
+
 \paragraph{Question 3 (Evaluation Metrics) [1 pts]:}  
 We must evaluate the quality of our predictions. In this part you will fill in "compute\_confusion\_matrix". You should write code to compute the confusion matrix as well as IoU for the predicted segmentation when compared to ground truth. We provide code for visualizing the computed values as well as computing mean average precision.
+\paragraph{Answer:} 
+\begin{quote}
+
+Below is the implementation of computing the confusion matrix and intersection of unit (IoU) as a byproduct, given the pair of prediction and ground truth of semantic segmentation. 
 
 \begin{lstlisting}[language=Python, basicstyle=\scriptsize]
 # Question 3: compute the confusion matrix and IoU metrics
@@ -160,6 +182,8 @@ def compute_confusion_matrix(gts, preds):
     return IoU, conf
 \end{lstlisting}
 
+Note that computing IoU becomes trivial after the confusion matrix is constructed. Fig.~\ref{fig:eval-simple-predict} is the visualization of the confusion matrix with for the aforementioned simple model yield by running \texttt{simple\_train()} function on the given training dataset. Note that the mAP and mIoU are the same to the reported results in Question 2.
+
 % visualization of confusion matrix
 \begin{figure}[h]
     \centering
@@ -168,8 +192,14 @@ def compute_confusion_matrix(gts, preds):
     \label{fig:eval-simple-predict}
 \end{figure}
 
+\end{quote}
+
 \paragraph{Question 4 (Loss function) [2 pt]:} 
 To train a model we need a loss function. In this part you will fill in "cross\_entropy\_criterion" with your implementation of the weighted cross entropy between predicted class probabilities and ground truth class labels.
+\paragraph{Answer:} 
+\begin{quote}
+
+Below is the implementation of the weighted cross entropy between predicted class probabilities and ground truth class labels.
 
 \begin{lstlisting}[language=Python, basicstyle=\scriptsize]
 def cross_entropy_criterion(predictions, labels, weights, device):
@@ -192,10 +222,16 @@ def cross_entropy_criterion(predictions, labels, weights, device):
     return loss
 \end{lstlisting}
 
-% TODO: EXPLAIN WHAT CROSS-ENTROPY AND WEIGHT DO
+The (categorical) cross entropy is a softmax activation---which has a role of encoding the arbitrary set of numbers into a normalized form so that it seems like a probability mass function---followed by the negative log-likelihood minimization---an optimization that penalizing non-similarity between two distributions. As a result, minimizing the cross entropy loss has an effect of similarizing the distribution of prediction to that of the ground-truth. Weight, which is derived by taking the inverse of class's frequencies in the dataset, has an impact of penalizing losses corresponding to the classes frequently appear, and vice versa; as a result, the classes rarely exist are considered more significantly so that the training model identifies them well.
+
+\end{quote}
 
 \paragraph{Question 5 (Train loop) [2 pt]:} 
 In this part you will implement the stochastic gradient descent training loop in pytorch, modifying "train". We provide code to validate a trained model and a skeleton for training one. 
+\paragraph{Answer:} 
+\begin{quote}
+
+Below is the implementation of the training loop for the deep-learning-based semantic segmentation model.
 
 \begin{lstlisting}[language=Python, basicstyle=\scriptsize]
 def train(model, optimizer, criterion, trainloader, device, 
@@ -266,12 +302,18 @@ def train(model, optimizer, criterion, trainloader, device,
     return model
 \end{lstlisting}
 
-% TODO: EXPLAIN WHY IT IS IMPORTANT TO MONITOR BOTH TRAINING AND VALIDATION LOSSES.
-% TODO: WHEN LOSS NO LONGER IMPROVES, WHAT WE CAN DO?
+Monitoring both training and validation loss is important to avoid the trained model's overfitting to the training dataset, as the goal of training is to apply the model to the general cases (i.e., across among training, validation, and test sub-datasets), not confining to the training set. If the validation loss does no longer improve or even get worse while the training loss is decreasing, it implies that the model is being overfitted to the training set, which means that it is now losing its generality. This is the reason why the model showing the best validation loss is being saved, and scheduler works when the validation loss is not improving, not the loss evaluated over the training set. 
 
+If the training and/or validation loss is not improving, it is easily diagnosed that the model is no longer being trained over the given training dataset. This is diagnozed that the optimization procedure has fallen into a local minimum or pitfall, and cannot escape from it due to the insufficient or large step size. To avoid such cases, one of actions usually considered to be taken is to apply scheduler to adjust the learning rate based on the number of epochs or allows dynamic learning rate reducing based on some validation measurements. By doing so, the model learns faster at the early phase in the training and learns finer at the late phase, hence minimizes the risk of falling into local mimima (which is suboptimal) and reachs the best outcome.
+
+\end{quote}
 
 \paragraph{Question 6 (Model definition and training) [4 pt]:} 
-Implement a basic convolutional neural network, as well as the U-Net architecture for semantic segmentation. Train your models with the code you wrote for Question 5. 
+Implement a basic convolutional neural network, as well as the U-Net architecture for semantic segmentation. Train your models with the code you wrote for Question 5.
+\paragraph{Answer:} 
+\begin{quote} 
+
+Below is the implementation of the basic convolutional neural network (CNN) blocks constructing both \texttt{BaseConv} and \texttt{UNet} segmentation model. \texttt{ConvBlock} class is a combination of a CNN layer, activation, and batch normalization. \texttt{DownConv} class is a CNN layer with downsampling, and \texttt{UpConv} is that with upsampling. \texttt{UNetUpConv}, which is a variant of \texttt{UpConv}, takes skip-connected tensor as an additional input to implement the UNet architecture.
 
 % Basic CNN blocks
 \begin{lstlisting}[language=Python, basicstyle=\scriptsize]
@@ -352,6 +394,8 @@ class UnetUpConv(nn.Module):
         return x
 \end{lstlisting}
 
+Below is the implementation of the basic convolutional neural network with a encoder-decoder shape for semantic segmentation task. The basic model structure resembles that of ResNet-18 for a fair comparison in Question 7, except for duplicated CNN layers on each level. The tensor shape at each layer is delineated in the attached source code in jupyter notebook.
+
 % BaseConv
 \begin{lstlisting}[language=Python, basicstyle=\scriptsize]
 class BaseConv(nn.Module):
@@ -403,6 +447,8 @@ def forward(self, x):
 
     return pred
 \end{lstlisting}
+
+Below is the implementation of the UNet, an extension of the aforementioned \texttt{BaseConv} architecture with skip connection. The tensor shape at each layer is delineated in the attached source code in jupyter notebook.
 
 % UNet
 \begin{lstlisting}[language=Python, basicstyle=\scriptsize]
@@ -461,6 +507,8 @@ def forward(self, x):
 
 % TODO: DESCRIBE BOTH MODELS IN DETAIL.
 
+Below is the example code for creating, traing, and evaluating a model with a \texttt{BaseConv} instance. The model type can differ at user's convenience (e.g., one can generate a \texttt{UNet} instance instead of \texttt{BaseConv}). I clarify that the identical training setup is used thoroughout the reported results in Question 6 and 7 for a fair comparison: SGD with learning rate 1e-3 as an optimizer, 50 epochs, turning off optimizer scheduler and early stopping. It is observed that these configurations give a reasonable training results (i.e., mAP $\geq$ 0.5) across all deep-learning models we are investigating. 
+
 % training code
 \begin{lstlisting}[language=Python, basicstyle=\scriptsize]
 # First make the model and put it on the device
@@ -479,7 +527,7 @@ base_model = train(base_model, optimizer, criterion, dataloader, device,
 preds, gts = validate_model(val_dataloader, base_model, list(dataset.classes), device)
 \end{lstlisting}
 
-% TODO: EXPLAIN WHY THOSE CONDITIONS AND HYPERPARAMETERS ARE CHOSEN
+Fig.~\ref{fig:loss-BaseConv-UNet} shows the loss curve over 50 epochs while training \texttt{BaseConv} (left) and \texttt{UNet} (right) models respectively, with the aforementioned training hyperparameter setup. 
 
 % logs of training & validation losses
 \begin{figure}[h]
@@ -488,8 +536,10 @@ preds, gts = validate_model(val_dataloader, base_model, list(dataset.classes), d
     \qquad
     \subfloat {{\includegraphics[width=0.45\linewidth]{loss-UNet.png}}}
     \caption{Loss curve of training \texttt{BaseConv} (left) and \texttt{UNet} (right) models, respectively.}
-    \label{fig:loss-BaseConv-UNet]}
+    \label{fig:loss-BaseConv-UNet}
 \end{figure}
+
+Below shows evaluation results of the trained \texttt{BaseConv} and \texttt{UNet} model. Both models demonstrate mAP and IoU across nine classes above 0.50, which is our minimum requirement to be achieved. Also, it is shown that \texttt{UNet} model obtains performance gain by about 0.05 in mAP and IoU compared to the \texttt{BaseConv} model, which implies that its skip connection structure helps. Also, in Fig.~\ref{fig:pred-BaseConv-UNet}, we visualize the prediction results for five different sample images in the test dataset.
 
 % prediction results
 {\centering \tt \small
@@ -518,20 +568,29 @@ misc: AP: 0.01, IoU: 0.09 \\
 mean: AP: 0.57, IoU: 0.60 \\
 }
 
-% TODO: ABLATION STUDY - EFFECT OF BATCHNORM ON TRAINING SPEED AND ACCURACY?
-
 \begin{figure}[h]
     \centering
     \subfloat {{\includegraphics[width=0.45\linewidth]{pred-BaseConv.png}}}
     \qquad
     \subfloat {{\includegraphics[width=0.45\linewidth]{pred-UNet.png}}}
     \caption{Predictions made by \texttt{BaseConv} (left) and \texttt{UNet} (right) models, respectively.}
-    \label{fig:pred-BaseConv-UNet]}
+    \label{fig:pred-BaseConv-UNet}
 \end{figure}
+
+% TODO: ABLATION STUDY - EFFECT OF BATCHNORM ON TRAINING SPEED AND ACCURACY?
+
+
+\end{quote}
 
 
 \paragraph{Question 7 (Use Pretrained Model) [3 pt]:} 
 In this part you will build on resnet-18 (note there are multiple ways to do this). Report your results, they should be better than the best you got using UNet training from scratch.
+\paragraph{Answer:} 
+\begin{quote}
+
+Below is the implementation of the leveraging the pretrained ResNet-18 for a semantic segmentation task. All of its pretrained CNN layers up to having 512 channels (i.e., all layers except for pooling, linear, and activation at the end) are exploited to construct encoder shape. Both the models without having skip-connections (\texttt{ResnetBasedModel}, the counterpart of \texttt{BaseConv}) and with having skip-connections (\texttt{ResnetUNetModel}, the counterpart of \texttt{UNet}) are implemented and trained. The tensor shape at each layer is delineated in the attached source code in jupyter notebook.
+
+Both models are trained with the same hyperparameters and setups as the \texttt{BaseConv} and \texttt{UNet} instance did: SGD with learning rate 1e-3 as an optimizer, 50 epochs, turning off optimizer scheduler and early stopping. 
 
 % resnet-based without skip connection
 \begin{lstlisting}[language=Python, basicstyle=\scriptsize]
@@ -639,7 +698,19 @@ def forward(self, x):
         return pred
 \end{lstlisting}
 
-% TODO: HOW DID I USE THE PRETRAINED MODEL?
+
+Fig.~\ref{fig:loss-ResnetBasedModel} shows the loss curve over 50 epochs while training \texttt{ResnetBasedModel} (left) and \texttt{ResnetUNetModel} (right) respectively, with the aforementioned training hyperparameter setup. 
+
+\begin{figure}[h]
+    \centering
+    \subfloat {{\includegraphics[width=0.45\linewidth]{loss-ResnetBasedModel.png}}}
+    \qquad
+    \subfloat {{\includegraphics[width=0.45\linewidth]{loss-ResnetUNetModel.png}}}
+    \caption{Loss curve of training ResNet-based models without skip connection (left) and with skip connection (right), respectively.}
+    \label{fig:loss-ResnetBasedModel}
+\end{figure}
+
+Below shows evaluation results of the trained \texttt{ResnetBasedModel} and \texttt{ResnetUNetModel}. Both models demonstrate mAP and IoU across nine classes above 0.60, which have yielded performance gain by about 0.1 from their counterparts in Question 6. Also, it is shown that \texttt{ResnetUNetModel} obtains performance gain by about 0.05 in mAP and IoU compared to the \texttt{ResnetBasedModel}, which implies that the skip connection structure still helps for the model based on the pretained ResNet-18 as well. Also, in Fig.~\ref{fig:pred-ResnetBasedModel}, we visualize the prediction results for five different sample images in the test dataset.
 
 {\centering \tt \small
 \# ResnetBasedModel \\
@@ -669,22 +740,14 @@ mean: AP: 0.65, IoU: 0.70 \\
 
 \begin{figure}[h]
     \centering
-    \subfloat {{\includegraphics[width=0.45\linewidth]{loss-ResnetBasedModel.png}}}
-    \qquad
-    \subfloat {{\includegraphics[width=0.45\linewidth]{loss-ResnetUNetModel.png}}}
-    \caption{Loss curve of training ResNet-based models without skip connection (left) and with skip connection (right), respectively.}
-    \label{fig:loss-ResnetBasedModel]}
-\end{figure}
-
-
-\begin{figure}[h]
-    \centering
     \subfloat {{\includegraphics[width=0.45\linewidth]{pred-ResnetBasedModel.png}}}
     \qquad
     \subfloat {{\includegraphics[width=0.45\linewidth]{pred-ResnetUNetModel.png}}}
     \caption{Predictions made by ResNet-based models without skip connection (left) and with skip connection (right), respectively.}
-    \label{fig:pred-ResnetBasedModel]}
+    \label{fig:pred-ResnetBasedModel}
 \end{figure}
+
+\end{quote}
 
 
 \section*{Instance Segmentation (Bonus 4pt)}
