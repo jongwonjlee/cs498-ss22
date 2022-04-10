@@ -577,7 +577,31 @@ mean: AP: 0.57, IoU: 0.60 \\
     \label{fig:pred-BaseConv-UNet}
 \end{figure}
 
-% TODO: ABLATION STUDY - EFFECT OF BATCHNORM ON TRAINING SPEED AND ACCURACY?
+In addition to comparing \texttt{BaseConv} and \texttt{UNet} models, I also conducted an ablation study on testing the impact of batch normalization. The tested case was a \texttt{BaseConv} model without batch normalization under the same hyperparameters and training environment. Speaking of the training speed, \texttt{BaseConv} without batch normalization slightly outperformed the vanilla \texttt{BaseConv} as both took 1135s and 1217s over 50 training epochs, respectively. However, as shown in the measured mAP/IoU below and visualization results along with training curve in Fig.~\ref{fig:ablation-study}, the model was hardly trained anything. From this, we realize that batch normalization plays an crucial role while training a CNN-based model.
+
+% prediction results
+{\centering \tt \small
+sky: AP: 0.16, IoU: 0.00 \\
+tree: AP: 0.18, IoU: 0.00 \\
+road: AP: 0.21, IoU: 0.00 \\
+grass: AP: 0.15, IoU: 0.00 \\
+water: AP: 0.08, IoU: 0.00 \\
+building: AP: 0.25, IoU: 1.00 \\
+mountain: AP: 0.03, IoU: 0.00 \\
+foreground: AP: 0.15, IoU: 0.00 \\
+misc: AP: 0.01, IoU: 0.00 \\
+mean: AP: 0.14, IoU: 0.11 \\
+}
+
+\begin{figure}[h]
+    \centering
+    \subfloat {{\includegraphics[height=6cm]{loss-BaseConv-no-batchnorm.png}}}
+    \qquad
+    \subfloat {{\includegraphics[height=6cm]{pred-BaseConv-no-batchnorm.png}}}
+    \caption{Training curve (left) and prediction results (right) for \texttt{BaseConv} without batch normalization.}
+    \label{fig:ablation-study}
+\end{figure}
+
 
 
 \end{quote}
@@ -749,6 +773,7 @@ mean: AP: 0.65, IoU: 0.70 \\
 
 \end{quote}
 
+\pagebreak
 
 \section*{Instance Segmentation (Bonus 4pt)}
 
