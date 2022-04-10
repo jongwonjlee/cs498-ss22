@@ -1,4 +1,4 @@
-\documentclass[11pt]{article}
+\documentclass[9pt]{article}
 \usepackage{graphicx}
 \usepackage{hyperref}
 \usepackage{caption}
@@ -65,7 +65,7 @@ if random.random() < 0.5:
 
 Fig.~\ref{fig:transform} is comparison of transformed images (a) when no transform is applied, (b) scaling is applied (\texttt{scale=(0.08, 1.0)}), (c) aspect ratio is applied (\texttt{ratio=(3/4, 4/3)}), and (d) horizontal flipping is applied (\texttt{if random.random() < 0.5}). 
 
-I decided to use \texttt{scale=(0.8, 1.0)}, \texttt{ratio=(3/4, 4/3)}, and \texttt{random.random() < 0.5} for data augmentation by default, as those are also the default setup for data augmentation in the off-the-shelf Pytorch dataloader classes except for the scaling factor, which is \texttt{scale=(00.8, 1.0)}; this is because I hypothesize its lower bound in default (0.08) is small and hence may yield too tiny tranformed image to represent the semantic segmentation dataset for a successful training of the model that we are aiming for. 
+I decided to use \texttt{scale=(0.8, 1.0)}, \texttt{ratio=(3/4, 4/3)}, and \texttt{random.random() < 0.5} for data augmentation by default, as those are also the default setup for data augmentation in the off-the-shelf Pytorch dataloader classes except for the scaling factor, which is \texttt{scale=(0.08, 1.0)}; this is because I hypothesize its lower bound in default (0.08) is small and hence may yield too tiny tranformed image to represent the semantic segmentation dataset for a successful training of the model that we are aiming for. 
 
 \begin{figure}[h]
     \centering
@@ -577,7 +577,7 @@ mean: AP: 0.57, IoU: 0.60 \\
     \label{fig:pred-BaseConv-UNet}
 \end{figure}
 
-In addition to comparing \texttt{BaseConv} and \texttt{UNet} models, I also conducted an ablation study on testing the impact of batch normalization. The tested case was a \texttt{BaseConv} model without batch normalization under the same hyperparameters and training environment. Speaking of the training speed, \texttt{BaseConv} without batch normalization slightly outperformed the vanilla \texttt{BaseConv} as both took 1135s and 1217s over 50 training epochs, respectively. However, as shown in the measured mAP/IoU below and visualization results along with training curve in Fig.~\ref{fig:ablation-study}, the model was hardly trained anything. From this, we realize that batch normalization plays an crucial role while training a CNN-based model.
+In addition to comparing \texttt{BaseConv} and \texttt{UNet} models, I also conducted an ablation study on testing the impact of batch normalization. The tested case was a \texttt{BaseConv} model without batch normalization under the same hyperparameters and training environment. Speaking of the training speed, \texttt{BaseConv} without batch normalization slightly outperformed the vanilla \texttt{BaseConv} as both took 1135 seconds and 1217 seconds over 50 training epochs, respectively. However, as shown in the measured mAP/IoU below and visualization results along with training curve in Fig.~\ref{fig:ablation-study}, the model was hardly trained anything. From this, we realize that batch normalization plays an crucial role while training a CNN-based model.
 
 % prediction results
 {\centering \tt \small
