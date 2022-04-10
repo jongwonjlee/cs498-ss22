@@ -1,0 +1,9 @@
+sky
+tree
+road
+grass
+water
+building
+mountain
+foreground
+misc
