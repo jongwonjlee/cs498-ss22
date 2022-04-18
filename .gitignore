@@ -18,3 +18,6 @@ __pycache__/
 *.zip
 
 mp2/assets/*
+mp4/models/*
+mp5/data/*
+mp5/results/*
