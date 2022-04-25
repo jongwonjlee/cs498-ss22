@@ -100,7 +100,7 @@ def track_sequence(seq_dets, num_frames, oxts, calib, vis_dir, image_dir, eval_f
                 trk.x[3], bbox3d[3] = orientation_correction(trk.x[3], bbox3d[3])
 
                 # kalman filter update with observation
-                trk.update(bbox3d) # Your implementation
+                trk.update(bbox3d, is_trivial=False) # Your implementation
 
                 trk.info = info[d, :][0]
         # ---------------

@@ -62,8 +62,14 @@ class Kalman:
         # Hint: the initial velocity is very uncertain for new detections
 
         # --------------------------- Begin your code here ---------------------------------------------
-
-
+        # State transition matrix: Populate elements corresponding to linear velocity dynamics
+        self.A[:3,-3:] = eye(3)
+        # Measurement matrix: Initialize elements mapping from x (with linear velocity) to z (without linear velocity)
+        self.H[:7,:7] = eye(7)
+        # State propagation noise matrix: Initialize elements corresponding to linear velocity with large values (100),
+        # as the initial values for linear velocity is very uncertain for new detections.
+        # This is reduced to be 5 for further timeteps as shown in `self.update()` member function 
+        self.Q[-3:,-3:] = eye(3)*100
         # --------------------------- End your code here   ---------------------------------------------
         return
 
@@ -80,8 +86,8 @@ class Kalman:
         """
         # Hint: you should be modifying self.x and self.Sigma
         # --------------------------- Begin your code here ---------------------------------------------
-
-
+        self.x = self.A @ self.x
+        self.Sigma = self.A @ self.Sigma @ self.A.T + self.Q
         # --------------------------- End your code here   ---------------------------------------------
 
         # Leave this at the end, within_range ensures that the angle is between -pi and pi
@@ -90,7 +96,7 @@ class Kalman:
 
     # Q2 and Q4.
     # TODO: Your code
-    def update(self, z):
+    def update(self, z, is_trivial=False):
         """
         Add a new measurement (z) to the Kalman filter.
         ----------
@@ -100,7 +106,27 @@ class Kalman:
 
         # --------------------------- Begin your code here ---------------------------------------------
 
+        if is_trivial:  # For Q2
+            # Trust measurement (detection) as it is
+            self.x[:7] = z
+        else:           # For Q4
+            # Apply bayesian filtering to relate the measurement (z) to the state (self.x)
+            
+            # Compute required matrices
+            self.S = self.H @ self.Sigma @ self.H.T + self.R
+            self.SI = np.linalg.inv(self.S)
+            self.K = self.Sigma @ self.H.T @ self.SI
+            self.y = self.H @ self.x
 
+            # Update state estimate
+            self.x = self.x + self.K @ (z - self.y)
+            # Update covariance estimate
+            self.Sigma = self.Sigma - self.K @ self.H @ self.Sigma
+
+            # Adjust state propagation noise matrix
+            # so that all states are equally propagated except for the linear velocity, 
+            # whose initial value is assumed to be extremely uncertain (100) but better later on (5).
+            self.Q[-3:,-3:] = eye(3)*5
         # --------------------------- End your code here   ---------------------------------------------
 
         # Leave this at the end, within_range ensures that the angle is between -pi and pi
