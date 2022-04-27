@@ -82,6 +82,28 @@ def track_sequence(seq_dets, num_frames, oxts, calib, vis_dir, image_dir, eval_f
         matched, unmatched_dets, unmatched_trks = data_association(frame_dets, trks_bbox, threshold=-0.2, algm=algm)
         # ---------------
 
+        is_Q0 = True
+        if is_Q0:
+            if image_dir is None:
+                img = np.zeros((375, 1242, 3), np.uint8)
+            else:
+                img = os.path.join(image_dir, "{:06d}.png".format(frame))
+                img = np.array(Image.open(img))
+
+            save_path = os.path.join(vis_dir, "{}.jpg".format(frame))
+            hw = (375, 1242)
+        
+            for det in frame_dets:
+                det_tmp = det
+                img = vis_obj(det_tmp, img, calib, hw, (255,0,0))
+
+            img = Image.fromarray(img)
+            img = img.resize((hw[1], hw[0]))
+            img.save(save_path)
+            if viz_on_screen:
+                plt.imshow(img)
+                plt.pause(0.2)
+
         # 4. Observation Model Update
         #   Now we can do a Kalman Filter update to the trackers with assigned detections
         #   TODO (student): You are tasked with implementing the Kalman Filter method "update(bbox3d)"
@@ -143,7 +165,7 @@ def track_sequence(seq_dets, num_frames, oxts, calib, vis_dir, image_dir, eval_f
         #       str_vis         - string to put above bbox, for example the tracker ID 
         #   You should modify and move this code around for your debugging purposes
         # ---------------
-        if True:
+        if False:
             if image_dir is None:
                 img = np.zeros((375, 1242, 3), np.uint8)
             else:
