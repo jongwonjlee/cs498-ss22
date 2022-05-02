@@ -62,14 +62,20 @@ class Kalman:
         # Hint: the initial velocity is very uncertain for new detections
 
         # --------------------------- Begin your code here ---------------------------------------------
+        # Uncertainty matrix: We are not confident in initial values to every state element
+        self.Sigma = eye(self.dim_x)*100
         # State transition matrix: Populate elements corresponding to linear velocity dynamics
         self.A[:3,-3:] = eye(3)
         # Measurement matrix: Initialize elements mapping from x (with linear velocity) to z (without linear velocity)
         self.H[:7,:7] = eye(7)
-        # State propagation noise matrix: Initialize elements corresponding to linear velocity with large values (100),
-        # as the initial values for linear velocity is very uncertain for new detections.
-        # This is reduced to be 5 for further timeteps as shown in `self.update()` member function 
-        self.Q[-3:,-3:] = eye(3)*100
+        # Process noise matrix: It describes how we uncertain about propagations to every state element.
+        # For position (0~3), they are set to zero under the assumption that we 'trust' linear velocity.
+        # Others (orientation, bounding box dimension, velocity) are set to 10
+        self.Q[:3,:3] = eye(3)*0
+        self.Q[3:,3:] = eye(7)*10
+        # Measurement noise matrix: It describes how we uncertain about measurements.
+        # For measurements (position, orientation, bounding box dimension), they are set to 1
+        self.R = eye(self.dim_z)*1
         # --------------------------- End your code here   ---------------------------------------------
         return
 
@@ -122,11 +128,6 @@ class Kalman:
             self.x = self.x + self.K @ (z - self.y)
             # Update covariance estimate
             self.Sigma = self.Sigma - self.K @ self.H @ self.Sigma
-
-            # Adjust state propagation noise matrix
-            # so that all states are equally propagated except for the linear velocity, 
-            # whose initial value is assumed to be extremely uncertain (100) but better later on (5).
-            self.Q[-3:,-3:] = eye(3)*5
         # --------------------------- End your code here   ---------------------------------------------
 
         # Leave this at the end, within_range ensures that the angle is between -pi and pi
