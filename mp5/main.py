@@ -20,11 +20,33 @@ def track_sequence(seq_dets, num_frames, oxts, calib, vis_dir, image_dir, eval_f
     trackers = []
     ID_count = 0
 
+    is_Q0 = False
+    is_Q6 = True
+
+    assert not (is_Q0 and is_Q6)
+
     # You can set this to True to see visualization on screen each frame
     viz_on_screen = False
     if viz_on_screen is True:
         plt.figure()
     for frame in range(num_frames):
+        # draw canvas
+        if is_Q0 or is_Q6:
+            if image_dir is None:
+                img = np.zeros((375, 1242, 3), np.uint8)
+            else:
+                img = os.path.join(image_dir, "{:06d}.png".format(frame))
+                img = np.array(Image.open(img))
+
+            save_path = os.path.join(vis_dir, "{}.jpg".format(frame))
+            hw = (375, 1242)
+
+        if is_Q6:
+            # plot all trackers before prediction (except dead ones)
+            for t, trk in enumerate(trackers):
+                img = vis_obj(Box3D.array2bbox(trk.x.reshape((-1))[:7]), 
+                              img, calib, hw, (135,206,235), "{}-".format(trk.ID))  # skyblue
+
         # seq_dets contains all the detections for the entire sequence
         # So first we need to process the detections into the right format, and extract current frame
         frame_dets = get_frame_det(seq_dets, frame)
@@ -82,27 +104,9 @@ def track_sequence(seq_dets, num_frames, oxts, calib, vis_dir, image_dir, eval_f
         matched, unmatched_dets, unmatched_trks = data_association(frame_dets, trks_bbox, threshold=-0.2, algm=algm)
         # ---------------
 
-        is_Q0 = True
         if is_Q0:
-            if image_dir is None:
-                img = np.zeros((375, 1242, 3), np.uint8)
-            else:
-                img = os.path.join(image_dir, "{:06d}.png".format(frame))
-                img = np.array(Image.open(img))
-
-            save_path = os.path.join(vis_dir, "{}.jpg".format(frame))
-            hw = (375, 1242)
-        
             for det in frame_dets:
-                det_tmp = det
-                img = vis_obj(det_tmp, img, calib, hw, (255,0,0))
-
-            img = Image.fromarray(img)
-            img = img.resize((hw[1], hw[0]))
-            img.save(save_path)
-            if viz_on_screen:
-                plt.imshow(img)
-                plt.pause(0.2)
+                img = vis_obj(det, img, calib, hw, (255,0,0))
 
         # 4. Observation Model Update
         #   Now we can do a Kalman Filter update to the trackers with assigned detections
@@ -139,6 +143,7 @@ def track_sequence(seq_dets, num_frames, oxts, calib, vis_dir, image_dir, eval_f
         # 6. Death
         #     Remove tracks that have been inactive for too long
         # ---------------
+        dead_trackers = []
         num_trks = len(trackers)
         for trk in reversed(trackers):
             # change format from [x,y,z,theta,l,w,h] to [h,w,l,x,y,z,theta]
@@ -147,8 +152,34 @@ def track_sequence(seq_dets, num_frames, oxts, calib, vis_dir, image_dir, eval_f
             num_trks -= 1
             # remove dead tracker
             if (trk.time_since_update >= max_age):
-                trackers.pop(num_trks)
+                dead_trackers.append(trackers.pop(num_trks))
         # ---------------
+
+        if is_Q6:
+            # plot all trackers (1) after update and (2) birth ones
+            for trk in trackers:
+                if (trk.hits == 1) and (trk.time_since_update == 0):
+                    # birthed trackers
+                    img = vis_obj(Box3D.array2bbox(trk.x.reshape((-1))[:7]), 
+                                  img, calib, hw, (0,255,0))
+                else:
+                    # rest trackers after update
+                    img = vis_obj(Box3D.array2bbox(trk.x.reshape((-1))[:7]), 
+                                  img, calib, hw, (0,0,128), "{}+".format(trk.ID))  # navy
+
+            # plot all dead trackers
+            for trk in dead_trackers:
+                # dead trackers
+                img = vis_obj(Box3D.array2bbox(trk.x.reshape((-1))[:7]), 
+                              img, calib, hw, (255,0,0))
+        
+        if is_Q0 or is_Q6:
+            img = Image.fromarray(img)
+            img = img.resize((hw[1], hw[0]))
+            img.save(save_path)
+            if viz_on_screen:
+                plt.imshow(img)
+                plt.pause(0.2)
 
         # Visualization
         #   There are a couple ways to visualize your results, we provide one example below
