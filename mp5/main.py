@@ -20,12 +20,23 @@ def track_sequence(seq_dets, num_frames, oxts, calib, vis_dir, image_dir, eval_f
     trackers = []
     ID_count = 0
 
-    is_Q0 = False
-    is_Q6 = True
-
+    # for visualization purpose
+    is_Q0 = True
+    is_Q6 = False
     assert not (is_Q0 and is_Q6)
 
+    # Q2: kalman_update = False, kalman_prediction = False
+    # Q4: kalman_update = True, kalman_prediction = False
+    # Q5: kalman_update = True, kalman_prediction = True
+
+    # for Kalman Update (Q4)
+    # if false, for trivial update (Q2)
+    kalman_update = False
+    # for Kalman Prediction (Q5)
+    kalman_prediction = False
+
     # You can set this to True to see visualization on screen each frame
+    save_img = True
     viz_on_screen = False
     if viz_on_screen is True:
         plt.figure()
@@ -62,7 +73,7 @@ def track_sequence(seq_dets, num_frames, oxts, calib, vis_dir, image_dir, eval_f
         trks_bbox = []
         for t in range(len(trackers)):
             tmp_tracker = trackers[t]
-            tmp_tracker.predict() # Your implementation
+            tmp_tracker.predict(kalman_prediction)
 
             # Why do we have this? 
             #   Imagine a tracker gets occluded for a few frames. 
@@ -105,8 +116,9 @@ def track_sequence(seq_dets, num_frames, oxts, calib, vis_dir, image_dir, eval_f
         # ---------------
 
         if is_Q0:
-            for det in frame_dets:
-                img = vis_obj(det, img, calib, hw, (255,0,0))
+            for i, det in enumerate(frame_dets):
+                trk_color = tuple([int(tmp * 255) for tmp in cmap[i % 256][:3]])
+                img = vis_obj(det, img, calib, hw, trk_color)
 
         # 4. Observation Model Update
         #   Now we can do a Kalman Filter update to the trackers with assigned detections
@@ -126,7 +138,7 @@ def track_sequence(seq_dets, num_frames, oxts, calib, vis_dir, image_dir, eval_f
                 trk.x[3], bbox3d[3] = orientation_correction(trk.x[3], bbox3d[3])
 
                 # kalman filter update with observation
-                trk.update(bbox3d, is_trivial=False) # Your implementation
+                trk.update(bbox3d, kalman_update) # Your implementation
 
                 trk.info = info[d, :][0]
         # ---------------
@@ -176,7 +188,8 @@ def track_sequence(seq_dets, num_frames, oxts, calib, vis_dir, image_dir, eval_f
         if is_Q0 or is_Q6:
             img = Image.fromarray(img)
             img = img.resize((hw[1], hw[0]))
-            img.save(save_path)
+            if save_img:
+                img.save(save_path)
             if viz_on_screen:
                 plt.imshow(img)
                 plt.pause(0.2)

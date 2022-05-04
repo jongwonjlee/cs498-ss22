@@ -81,7 +81,7 @@ class Kalman:
 
     # Q5.
     # TODO: Your code
-    def predict(self):
+    def predict(self, kalman_prediction=True):
         """
         Predict next state (prior) using the Kalman filter state propagation
         equations.
@@ -92,8 +92,11 @@ class Kalman:
         """
         # Hint: you should be modifying self.x and self.Sigma
         # --------------------------- Begin your code here ---------------------------------------------
-        self.x = self.A @ self.x
-        self.Sigma = self.A @ self.Sigma @ self.A.T + self.Q
+        if kalman_prediction:
+            self.x = self.A @ self.x
+            self.Sigma = self.A @ self.Sigma @ self.A.T + self.Q
+        else:
+            pass
         # --------------------------- End your code here   ---------------------------------------------
 
         # Leave this at the end, within_range ensures that the angle is between -pi and pi
@@ -102,7 +105,7 @@ class Kalman:
 
     # Q2 and Q4.
     # TODO: Your code
-    def update(self, z, is_trivial=False):
+    def update(self, z, kalman_update=True):
         """
         Add a new measurement (z) to the Kalman filter.
         ----------
@@ -112,12 +115,8 @@ class Kalman:
 
         # --------------------------- Begin your code here ---------------------------------------------
 
-        if is_trivial:  # For Q2
-            # Trust measurement (detection) as it is
-            self.x[:7] = z
-        else:           # For Q4
+        if kalman_update:  # For Q4
             # Apply bayesian filtering to relate the measurement (z) to the state (self.x)
-            
             # Compute required matrices
             self.S = self.H @ self.Sigma @ self.H.T + self.R
             self.SI = np.linalg.inv(self.S)
@@ -128,6 +127,11 @@ class Kalman:
             self.x = self.x + self.K @ (z - self.y)
             # Update covariance estimate
             self.Sigma = self.Sigma - self.K @ self.H @ self.Sigma
+
+        else:      # For Q2
+            # Trust measurement (detection) as it is
+            self.x[:7] = z
+        
         # --------------------------- End your code here   ---------------------------------------------
 
         # Leave this at the end, within_range ensures that the angle is between -pi and pi
